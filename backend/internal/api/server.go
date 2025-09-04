@@ -12,6 +12,8 @@ import (
     "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/orchestrator"
     "github.com/example/agent-orchestrator/internal/tools"
+    gem "github.com/example/agent-orchestrator/internal/providers/gemini"
+    "os"
 )
 
 var orch *orchestrator.Orchestrator
@@ -21,7 +23,17 @@ func init() {
     reg := tools.NewRegistry()
     reg.Register(&tools.EchoTool())
     reg.Register(&tools.HTTPGetTool())
-    orch = orchestrator.New(&agents.MockPlanner{}, &agents.ToolExecutor{Registry: reg}, &agents.SimpleVerifier{})
+    // Planner selection
+    var planner agents.Planner = &agents.MockPlanner{}
+    if os.Getenv("USE_LLM_PLANNER") == "1" {
+        planner = &agents.LLMPlanner{Client: gem.NewFromEnv()}
+    }
+    // Verifier selection
+    var verifier agents.Verifier = &agents.SimpleVerifier{}
+    if os.Getenv("USE_LLM_VERIFIER") == "1" {
+        verifier = &agents.LLMVerifier{Client: gem.NewFromEnv()}
+    }
+    orch = orchestrator.New(planner, &agents.ToolExecutor{Registry: reg}, verifier)
 }
 
 func RegisterRoutes(mux *http.ServeMux) {
@@ -85,4 +97,3 @@ func genID() string {
     rand.Seed(time.Now().UnixNano())
     return time.Now().Format("20060102150405") + "-" + string('a'+rune(rand.Intn(26)))
 }
-

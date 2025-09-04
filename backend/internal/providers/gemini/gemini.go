@@ -1,18 +1,17 @@
 package gemini
 
 // Placeholder for Gemini client integration.
-// To keep the MVP buildable without external deps, this file exposes
-// a minimal interface and no-op implementation you can replace later
-// with github.com/google/generative-ai-go/genai.
+// Default build provides a mock client and factory returning it.
+// A real client is provided under build tag `gemini`.
 
 import (
     "context"
+    "os"
+    "strings"
 )
 
 type Client interface {
-    // Plan should accept a prompt and return a structured plan proposal.
     GeneratePlan(ctx context.Context, prompt string) (string, error)
-    // Verify should validate a given result against acceptance criteria.
     Verify(ctx context.Context, prompt string, output string) (bool, string, error)
 }
 
@@ -20,10 +19,20 @@ type Client interface {
 type MockClient struct{}
 
 func (m *MockClient) GeneratePlan(ctx context.Context, prompt string) (string, error) {
-    return "[{\"id\":\"step1\",\"tool\":\"echo\",\"description\":\"Echo input\"}]", nil
+    // naive heuristic: if prompt suggests http/url, return http_get, otherwise echo
+    p := strings.ToLower(prompt)
+    if strings.Contains(p, "http") || strings.Contains(p, "url") {
+        return `[{"id":"step1","description":"HTTP GET a URL","tool":"http_get","inputs":{"url":"<from-query>"}}]`, nil
+    }
+    return `[{"id":"step1","description":"Echo the query","tool":"echo","inputs":{"text":"<from-query>"}}]`, nil
 }
 
 func (m *MockClient) Verify(ctx context.Context, prompt string, output string) (bool, string, error) {
-    return output != "", "ok", nil
+    return strings.TrimSpace(output) != "", "ok", nil
 }
 
+// NewFromEnv returns a Client. Default (no build tag) returns a MockClient.
+func NewFromEnv() Client {
+    _ = os.Getenv("GOOGLE_API_KEY") // ignored in mock
+    return &MockClient{}
+}

@@ -1,0 +1,109 @@
+package agents
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "strings"
+
+    "github.com/example/agent-orchestrator/internal/models"
+    gem "github.com/example/agent-orchestrator/internal/providers/gemini"
+)
+
+// LLMPlanner uses an LLM provider to produce a structured plan.
+type LLMPlanner struct {
+    Client gem.Client
+}
+
+type llmStep struct {
+    ID          string                 `json:"id"`
+    Description string                 `json:"description"`
+    Tool        string                 `json:"tool"`
+    Inputs      map[string]any         `json:"inputs,omitempty"`
+    Deps        []string               `json:"deps,omitempty"`
+}
+
+func (p *LLMPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan, error) {
+    prompt := buildPlanPrompt(task)
+    raw, err := p.Client.GeneratePlan(ctx, prompt)
+    if err != nil || strings.TrimSpace(raw) == "" {
+        // Fallback to trivial plan
+        return trivialPlan(task), nil
+    }
+    var steps []llmStep
+    if err := json.Unmarshal([]byte(raw), &steps); err != nil {
+        // Be lenient; sometimes models wrap JSON. Try to extract first [] block.
+        if arr := extractJSONArray(raw); arr != "" {
+            if err2 := json.Unmarshal([]byte(arr), &steps); err2 != nil {
+                return trivialPlan(task), nil
+            }
+        } else {
+            return trivialPlan(task), nil
+        }
+    }
+    if len(steps) == 0 {
+        return trivialPlan(task), nil
+    }
+    out := make([]*models.Step, 0, len(steps))
+    for i, s := range steps {
+        id := s.ID
+        if id == "" {
+            id = fmt.Sprintf("step%d", i+1)
+        }
+        out = append(out, &models.Step{
+            ID:          id,
+            Description: s.Description,
+            Tool:        s.Tool,
+            Inputs:      s.Inputs,
+            Deps:        s.Deps,
+            Status:      models.StatusPending,
+        })
+    }
+    return &models.Plan{Steps: out}, nil
+}
+
+func buildPlanPrompt(task *models.Task) string {
+    return fmt.Sprintf(`You are a planner agent. Given the user query and optional context, output a JSON array of steps only, no prose.
+Each step object must be: {"id": "stepN", "description": "...", "tool": "echo|http_get|...", "inputs": { ... }, "deps": ["stepK"]}
+Keep it minimal. If the query looks like a URL or mentions http, use tool "http_get" with {"url": "<the url>"}. Else use tool "echo" with {"text": "<the query>"}.
+User query: %s
+Context: %v`, task.Query, task.Context)
+}
+
+func trivialPlan(task *models.Task) *models.Plan {
+    lower := strings.ToLower(task.Query)
+    if strings.Contains(lower, "http") || strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+        return &models.Plan{Steps: []*models.Step{{
+            ID:          "step1",
+            Description: "HTTP GET a URL",
+            Tool:        "http_get",
+            Inputs:      map[string]any{"url": task.Query},
+            Status:      models.StatusPending,
+        }}}
+    }
+    return &models.Plan{Steps: []*models.Step{{
+        ID:          "step1",
+        Description: "Echo the query",
+        Tool:        "echo",
+        Inputs:      map[string]any{"text": task.Query},
+        Status:      models.StatusPending,
+    }}}
+}
+
+func extractJSONArray(s string) string {
+    // crude extractor for the first top-level JSON array in a string
+    start := strings.Index(s, "[")
+    if start == -1 { return "" }
+    depth := 0
+    for i := start; i < len(s); i++ {
+        if s[i] == '[' { depth++ }
+        if s[i] == ']' {
+            depth--
+            if depth == 0 {
+                return s[start:i+1]
+            }
+        }
+    }
+    return ""
+}
+
