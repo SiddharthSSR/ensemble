@@ -37,14 +37,10 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 
-## CI / CD
-- CI: `.github/workflows/ci.yml` builds backend (Go) and frontend (Vite) on push/PR.
-- Docker Publish: `.github/workflows/backend-docker.yml` builds and pushes the backend image to GHCR as `ghcr.io/<owner>/ensemble-backend` on `main` pushes and tags `v*.*.*`.
-- Frontend Pages: `.github/workflows/frontend-pages.yml` builds and deploys the frontend to GitHub Pages from `main`.
-
-After pushing to GitHub:
-- Enable GitHub Pages: Repository → Settings → Pages → Build and deployment → Source: GitHub Actions.
-- Frontend will be available at `https://<your-username>.github.io/ensemble/`.
+## Notes
+- Planner: rule-based mock. Replace with Gemini client in `internal/providers/gemini` and a real planner in `internal/agents`.
+- Safety: tools are whitelisted. No arbitrary code execution.
+- Persistence: in-memory for MVP. Swap with a store if needed.
 
 ## Docker / Compose
 - Build and run both services locally:
@@ -54,4 +50,3 @@ After pushing to GitHub:
 - Images:
   - Backend: builds from `backend/Dockerfile`
   - Frontend: builds static site with Node then serves via Nginx
-
