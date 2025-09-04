@@ -11,6 +11,7 @@ High-level change log for major refactors and features. Keep bullets concise.
   - Switched `LLMPlanner` and `LLMVerifier` to use the generic `llm.Client`.
   - Improved planner parsing: strips code fences, extracts first JSON array; graceful fallback to trivial plan.
   - Verifier now parses JSON verdicts `{ "ok": bool, "reason": string }` when present.
+  - Adjusted LLM planner prompt to prefer 2–3 ordered steps using existing tools (echo, http_get) without cross-step data wiring.
 - API wiring:
   - `internal/api/server.go` now selects the LLM client via `llm.NewFromEnv()` when `USE_LLM_PLANNER` / `USE_LLM_VERIFIER` are enabled.
 - Configuration & docs:
@@ -18,4 +19,3 @@ High-level change log for major refactors and features. Keep bullets concise.
   - Updated `README.md` to document multi-provider support and setup steps.
 - Build verification:
   - Verified `go build ./...` succeeds after refactor.
-

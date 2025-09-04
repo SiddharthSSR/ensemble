@@ -62,9 +62,23 @@ func (p *LLMPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan,
 }
 
 func buildPlanPrompt(task *models.Task) string {
-    return fmt.Sprintf(`You are a planner agent. Given the user query and optional context, output a JSON array of steps only, no prose.
-Each step object must be: {"id": "stepN", "description": "...", "tool": "echo|http_get|...", "inputs": { ... }, "deps": ["stepK"]}
-Keep it minimal. If the query looks like a URL or mentions http, use tool "http_get" with {"url": "<the url>"}. Else use tool "echo" with {"text": "<the query>"}.
+    return fmt.Sprintf(`You are a planning agent for a constrained tool runner.
+Output ONLY a JSON array of step objects, no prose, no code fences.
+
+Tools (you MUST stick to these):
+- echo: inputs {"text": string}
+- http_get: inputs {"url": string}
+
+Rules:
+- Produce 1–3 ordered steps. Prefer 2 steps when helpful.
+- Steps must be self-contained; DO NOT reference outputs of prior steps.
+- Use "deps" to express order (e.g., step2 depends on step1) but avoid dynamic input wiring.
+- If the query contains or implies a URL, first add an http_get step using that URL.
+- After fetching (if applicable), add an echo step that states a concise next action or summary aligned with the user’s goal (use your best judgment, but do not copy unknown fetched content).
+- If there is no URL, use 1–2 echo steps: first restate or clarify the intent; optionally add a second echo suggesting a next action.
+
+Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get", "inputs": { ... }, "deps": ["stepK"]}
+
 User query: %s
 Context: %v`, task.Query, task.Context)
 }
