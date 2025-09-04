@@ -31,3 +31,14 @@ High-level change log for major refactors and features. Keep bullets concise.
   - Added simple input substitution to map `{{step:ID.output}}` to the stringified output of prior steps.
   - Applies to both plan+run and execute-existing-plan paths.
  - Docs updated to mention `summarize` tool and output-referencing template.
+
+## 2025-09-04 (tools)
+
+- New tools:
+  - `http_post_json`: POST JSON to APIs with optional headers; returns response body and status in logs.
+  - `html_to_text`: Convert HTML to readable text using stdlib HTML parser; use before summarization.
+  - `llm_answer`: Ask the configured LLM to answer a question directly.
+- Planner prompt:
+  - Now recommends URL flow: http_get → html_to_text → summarize; and uses llm_answer for direct questions.
+- Docs:
+  - Added examples for the new tools in README.

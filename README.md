@@ -2,6 +2,7 @@
 
 ## Overview
 Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. LLM integration is provider-agnostic (OpenAI, Anthropic, Gemini via HTTP) with a mock fallback. Tools are pluggable (echo, http_get, summarize).
+New tools: html_to_text, http_post_json, llm_answer.
 
 ## Flowchart
 ```mermaid
@@ -58,6 +59,29 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - Referencing previous outputs: set a string input exactly to `{{step:ID.output}}` to pass a prior step’s output into a later step (e.g., use `summarize` on `http_get` output).
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
+
+
+### Tools and Examples
+- http_post_json
+  - Purpose: Call JSON APIs via POST.
+  - Inputs: `url: string`, `json: any|string`, `headers?: map[string]string`, `timeout_ms?: number`
+  - Example:
+    - `{"tool":"http_post_json","inputs":{"url":"https://httpbin.org/post","json":{"hello":"world"}}}`
+  - Output: Response body as string; logs include HTTP status and content-type.
+
+- html_to_text
+  - Purpose: Convert HTML string to readable text (strips scripts/styles, compacts whitespace).
+  - Inputs: `html: string`
+  - Example chain: `http_get` → `html_to_text` → `summarize`
+    - step1: `{ "tool":"http_get", "inputs": {"url":"https://example.com"} }`
+    - step2: `{ "tool":"html_to_text", "inputs": {"html":"{{step:step1.output}}"}, "deps":["step1"] }`
+    - step3: `{ "tool":"summarize", "inputs": {"text":"{{step:step2.output}}"}, "deps":["step2"] }`
+
+- llm_answer
+  - Purpose: Directly ask the configured LLM to answer a question concisely.
+  - Inputs: `text: string` (or `question: string`), `instructions?: string`
+  - Example:
+    - `{ "tool":"llm_answer", "inputs": {"text": "What is an AI agent?"} }`
 
 ### LLM Providers
 - Enable LLM planner and/or verifier by setting:
