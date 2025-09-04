@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+
+# Node/React
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env*
+
+# Go
+backend/bin/
+backend/build/
+backend/dist/
+backend/coverage.out
+backend/.env*
+
+# Logs
+*.log
+
