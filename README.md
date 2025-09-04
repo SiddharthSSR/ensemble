@@ -3,6 +3,26 @@
 ## Overview
 Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. Gemini integration is stubbed for now; a mock planner and simple verifier are included. Tools are pluggable (echo, http_get provided).
 
+## Flowchart
+```mermaid
+flowchart TD
+  U["User / Frontend"] -->|POST /tasks| API["Go API"]
+  API -->|Create Task| ORCH["Orchestrator"]
+  ORCH -->|Plan| PL["Planner (LLM/Mock)"]
+  PL -->|Plan JSON| ORCH
+  ORCH -->|For each ready step| EXE["Executor"]
+  EXE -->|Dispatch| REG["Tool Registry"]
+  REG -->|Run tool| TOOL["Tool (echo, http_get, ...)"]
+  TOOL -->|Output + Logs| EXE
+  EXE --> RES["Result"]
+  RES --> VER["Verifier (LLM/Simple)"]
+  VER -->|ok| ORCH
+  VER -->|fail| ORCH
+  ORCH -->|Update task state| API
+  ORCH -->|All steps verified| DONE[(Task SUCCESS)]
+  ORCH -->|Any step failed| FAIL[(Task FAILED)]
+```
+
 ## Project Structure
 - backend/
   - cmd/server: entrypoint
@@ -46,6 +66,11 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
   - `go build -tags=gemini ./cmd/server`
   - Or run: `GOOGLE_API_KEY=... USE_LLM_PLANNER=1 go run -tags=gemini ./cmd/server`
 
+### .env support
+- The backend loads environment variables from `.env` in `backend/` if present.
+- Copy `backend/.env.example` to `backend/.env` and fill values:
+  - `PORT`, `GOOGLE_API_KEY`, `USE_LLM_PLANNER`, `USE_LLM_VERIFIER`.
+
 ## TODO
 - Orchestrator: per-step timeouts, retries with backoff, and cancellation.
 - Persistence: store tasks/plans/results in SQLite with a simple repository.
@@ -62,11 +87,4 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 
-## Docker / Compose
-- Build and run both services locally:
-  - `docker compose up --build`
-  - Backend: http://localhost:8080
-  - Frontend: http://localhost:8081
-- Images:
-  - Backend: builds from `backend/Dockerfile`
-  - Frontend: builds static site with Node then serves via Nginx
+ 

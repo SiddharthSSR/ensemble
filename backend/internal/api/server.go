@@ -9,7 +9,6 @@ import (
     "time"
 
     "github.com/example/agent-orchestrator/internal/agents"
-    "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/orchestrator"
     "github.com/example/agent-orchestrator/internal/tools"
     gem "github.com/example/agent-orchestrator/internal/providers/gemini"
@@ -21,8 +20,8 @@ var orch *orchestrator.Orchestrator
 func init() {
     // Wire default components for MVP
     reg := tools.NewRegistry()
-    reg.Register(&tools.EchoTool())
-    reg.Register(&tools.HTTPGetTool())
+    reg.Register(&tools.EchoTool{})
+    reg.Register(&tools.HTTPGetTool{})
     // Planner selection
     var planner agents.Planner = &agents.MockPlanner{}
     if os.Getenv("USE_LLM_PLANNER") == "1" {

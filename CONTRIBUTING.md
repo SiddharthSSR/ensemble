@@ -5,8 +5,7 @@ Thanks for your interest in contributing! This guide covers local setup, workflo
 ## Prerequisites
 - Go 1.21+
 - Node.js 20 + npm
-- Docker + Docker Compose (optional, for containers)
-- Google API Key (optional, for future Gemini integration): `GOOGLE_API_KEY`
+- Google API Key (optional, for Gemini integration): `GOOGLE_API_KEY`
 
 ## Project Layout
 - `backend/` — Go HTTP API, agents, orchestrator, tools
@@ -22,9 +21,7 @@ Thanks for your interest in contributing! This guide covers local setup, workflo
 - Backend: `cd backend && go run ./cmd/server` (http://localhost:8080)
 - Frontend: `cd frontend && npm run dev` (http://localhost:5173)
 
-3) Or run via Docker:
-- From repo root: `docker compose up --build`
-- Backend: http://localhost:8080, Frontend: http://localhost:8081
+ 
 
 ## Environment
 - Backend:

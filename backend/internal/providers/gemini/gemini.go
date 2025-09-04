@@ -1,3 +1,5 @@
+//go:build !gemini
+
 package gemini
 
 // Placeholder for Gemini client integration.

@@ -6,9 +6,11 @@ import (
     "os"
 
     "github.com/example/agent-orchestrator/internal/api"
+    "github.com/joho/godotenv"
 )
 
 func main() {
+    _ = godotenv.Load() // load .env if present
     addr := ":8080"
     if v := os.Getenv("PORT"); v != "" {
         addr = ":" + v
@@ -36,4 +38,3 @@ func cors(next http.Handler) http.Handler {
         next.ServeHTTP(w, r)
     })
 }
-
