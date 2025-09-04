@@ -1,7 +1,7 @@
 # Agent Orchestrator (Go + React)
 
 ## Overview
-Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. Gemini integration is stubbed for now; a mock planner and simple verifier are included. Tools are pluggable (echo, http_get provided).
+Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. LLM integration is provider-agnostic (OpenAI, Anthropic, Gemini via HTTP) with a mock fallback. Tools are pluggable (echo, http_get provided).
 
 ## Flowchart
 ```mermaid
@@ -26,14 +26,13 @@ flowchart TD
 ## Project Structure
 - backend/
   - cmd/server: entrypoint
-  - internal/{api,agents,models,orchestrator,providers/gemini,tools}
+  - internal/{api,agents,models,orchestrator,providers/{llm,gemini},tools}
 - frontend/
   - Vite + React + TS app
 
 ## Run Backend
 ```
 cd backend
-GOOGLE_API_KEY=your_key # optional for future Gemini integration
 go run ./cmd/server
 ```
 Server listens on :8080.
@@ -57,19 +56,22 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 
-### Gemini (optional)
-- Default build uses a mock Gemini client and the rule-based planner.
-- Enable LLM planner and/or verifier:
+### LLM Providers
+- Enable LLM planner and/or verifier by setting:
   - `USE_LLM_PLANNER=1` and/or `USE_LLM_VERIFIER=1`
-  - Set `GOOGLE_API_KEY` to your Gemini API key.
-- To build with the real Gemini SDK, compile with the `gemini` build tag:
-  - `go build -tags=gemini ./cmd/server`
-  - Or run: `GOOGLE_API_KEY=... USE_LLM_PLANNER=1 go run -tags=gemini ./cmd/server`
+- Configure provider via env:
+  - `LLM_PROVIDER` = `openai` | `anthropic` | `gemini`
+  - `LLM_MODEL` (optional; sensible default picked if empty)
+  - API Key envs: set the one matching your provider
+    - `OPENAI_API_KEY`
+    - `ANTHROPIC_API_KEY`
+    - `GOOGLE_API_KEY`
+- If no provider/key is set, a mock LLM is used.
 
 ### .env support
 - The backend loads environment variables from `.env` in `backend/` if present.
 - Copy `backend/.env.example` to `backend/.env` and fill values:
-  - `PORT`, `GOOGLE_API_KEY`, `USE_LLM_PLANNER`, `USE_LLM_VERIFIER`.
+  - `PORT`, `USE_LLM_PLANNER`, `USE_LLM_VERIFIER`, `LLM_PROVIDER`, `LLM_MODEL`, and provider API key.
 
 ## TODO
 - Orchestrator: per-step timeouts, retries with backoff, and cancellation.
@@ -83,7 +85,7 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - Tests: unit tests for agents/tools and integration tests for orchestration.
 
 ## Notes
-- Planner: rule-based mock. Replace with Gemini client in `internal/providers/gemini` and a real planner in `internal/agents`.
+- Planner: rule-based mock by default; when enabled, planner/verifier use the provider configured under `internal/providers/llm`.
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 

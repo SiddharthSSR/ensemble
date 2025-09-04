@@ -7,13 +7,11 @@ import (
     "strings"
 
     "github.com/example/agent-orchestrator/internal/models"
-    gem "github.com/example/agent-orchestrator/internal/providers/gemini"
+    "github.com/example/agent-orchestrator/internal/providers/llm"
 )
 
 // LLMPlanner uses an LLM provider to produce a structured plan.
-type LLMPlanner struct {
-    Client gem.Client
-}
+type LLMPlanner struct { Client llm.Client }
 
 type llmStep struct {
     ID          string                 `json:"id"`
@@ -31,9 +29,10 @@ func (p *LLMPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan,
         return trivialPlan(task), nil
     }
     var steps []llmStep
-    if err := json.Unmarshal([]byte(raw), &steps); err != nil {
+    text := normalizeJSONText(raw)
+    if err := json.Unmarshal([]byte(text), &steps); err != nil {
         // Be lenient; sometimes models wrap JSON. Try to extract first [] block.
-        if arr := extractJSONArray(raw); arr != "" {
+        if arr := extractJSONArray(text); arr != "" {
             if err2 := json.Unmarshal([]byte(arr), &steps); err2 != nil {
                 return trivialPlan(task), nil
             }
@@ -107,3 +106,27 @@ func extractJSONArray(s string) string {
     return ""
 }
 
+func normalizeJSONText(s string) string {
+    t := strings.TrimSpace(s)
+    // Strip code fences like ```json ... ```
+    if strings.HasPrefix(t, "```") {
+        // remove first fence
+        t = strings.TrimPrefix(t, "```")
+        // drop possible language hint, e.g., json
+        if idx := strings.IndexByte(t, '\n'); idx != -1 {
+            t = t[idx+1:]
+        }
+        // remove trailing fence if present
+        if j := strings.LastIndex(t, "```"); j != -1 {
+            t = t[:j]
+        }
+        t = strings.TrimSpace(t)
+    }
+    // If it's not starting with '[' try to extract the first JSON array
+    if !strings.HasPrefix(strings.TrimSpace(t), "[") {
+        if arr := extractJSONArray(t); arr != "" {
+            return arr
+        }
+    }
+    return t
+}

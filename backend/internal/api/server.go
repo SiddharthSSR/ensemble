@@ -11,7 +11,7 @@ import (
     "github.com/example/agent-orchestrator/internal/agents"
     "github.com/example/agent-orchestrator/internal/orchestrator"
     "github.com/example/agent-orchestrator/internal/tools"
-    gem "github.com/example/agent-orchestrator/internal/providers/gemini"
+    "github.com/example/agent-orchestrator/internal/providers/llm"
     "os"
 )
 
@@ -25,12 +25,12 @@ func init() {
     // Planner selection
     var planner agents.Planner = &agents.MockPlanner{}
     if os.Getenv("USE_LLM_PLANNER") == "1" {
-        planner = &agents.LLMPlanner{Client: gem.NewFromEnv()}
+        planner = &agents.LLMPlanner{Client: llm.NewFromEnv()}
     }
     // Verifier selection
     var verifier agents.Verifier = &agents.SimpleVerifier{}
     if os.Getenv("USE_LLM_VERIFIER") == "1" {
-        verifier = &agents.LLMVerifier{Client: gem.NewFromEnv()}
+        verifier = &agents.LLMVerifier{Client: llm.NewFromEnv()}
     }
     orch = orchestrator.New(planner, &agents.ToolExecutor{Registry: reg}, verifier)
 }
