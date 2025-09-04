@@ -8,6 +8,7 @@ type Status string
 
 const (
     StatusPending  Status = "PENDING"
+    StatusPlanned  Status = "PLANNED"
     StatusRunning  Status = "RUNNING"
     StatusSuccess  Status = "SUCCESS"
     StatusFailed   Status = "FAILED"
@@ -45,4 +46,3 @@ type Result struct {
     Error    string `json:"error,omitempty"`
     Retries  int    `json:"retries"`
 }
-

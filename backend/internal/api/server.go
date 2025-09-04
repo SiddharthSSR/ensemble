@@ -75,6 +75,27 @@ func RegisterRoutes(mux *http.ServeMux) {
         w.WriteHeader(http.StatusAccepted)
     })
 
+    mux.HandleFunc("/tasks/plan/", func(w http.ResponseWriter, r *http.Request) {
+        // path: /tasks/plan/{id}
+        if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
+        id := r.URL.Path[len("/tasks/plan/"):]
+        plan, err := orch.PlanOnly(r.Context(), id)
+        if err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
+        respondJSON(w, plan)
+    })
+
+    mux.HandleFunc("/tasks/execute/", func(w http.ResponseWriter, r *http.Request) {
+        // path: /tasks/execute/{id}
+        if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
+        id := r.URL.Path[len("/tasks/execute/"):]
+        go func() {
+            if err := orch.ExecutePlan(context.Background(), id); err != nil {
+                log.Printf("execute error: %v", err)
+            }
+        }()
+        w.WriteHeader(http.StatusAccepted)
+    })
+
     mux.HandleFunc("/tasks/", func(w http.ResponseWriter, r *http.Request) {
         // path: /tasks/{id}
         if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }

@@ -46,10 +46,12 @@ npm run dev
 App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 
 ## API
-- POST /tasks { query, context? } → Task
-- POST /tasks/start/{id} → 202 Accepted, starts orchestration
-- GET /tasks → list
-- GET /tasks/{id} → details (plan, steps, results)
+- POST `/tasks` { query, context? } → create Task (status `PENDING`)
+- POST `/tasks/plan/{id}` → compute plan only, return plan (task becomes `PLANNED`)
+- POST `/tasks/execute/{id}` → execute an existing plan without re-planning
+- POST `/tasks/start/{id}` → plan + execute (full flow)
+- GET `/tasks` → list
+- GET `/tasks/{id}` → details (includes plan, steps, results)
 
 ## Notes
 - Planner: rule-based mock. Replace with Gemini client in `internal/providers/gemini` and a real planner in `internal/agents`.
@@ -86,6 +88,7 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 
 ## Notes
 - Planner: rule-based mock by default; when enabled, planner/verifier use the provider configured under `internal/providers/llm`.
+- Planning/Execution: you can preview steps via `/tasks/plan/{id}` and then run them via `/tasks/execute/{id}`; or do both with `/tasks/start/{id}`.
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 
