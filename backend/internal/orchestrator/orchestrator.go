@@ -2,7 +2,10 @@ package orchestrator
 
 import (
     "context"
+    "encoding/json"
     "errors"
+    "fmt"
+    "strings"
     "sync"
     "time"
 
@@ -71,9 +74,12 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
     t.Plan = plan
 
     // Sequential execution MVP
+    resultsByID := map[string]*models.Result{}
     for _, step := range plan.Steps {
         step.Status = models.StatusRunning
         t.UpdatedAt = time.Now()
+        // resolve input references from prior step outputs
+        step.Inputs = resolveInputs(step.Inputs, resultsByID)
         res, _ := o.Executor.Execute(ctx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
         res.Verified = verified
@@ -86,6 +92,7 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
             return nil
         }
         res.Verified = true
+        resultsByID[step.ID] = res
         if t.Results == nil { t.Results = []*models.Result{} }
         t.Results = append(t.Results, res)
         step.Status = models.StatusSuccess
@@ -127,9 +134,11 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
     t.Status = models.StatusRunning
     t.UpdatedAt = time.Now()
     // Sequential execution MVP
+    resultsByID := map[string]*models.Result{}
     for _, step := range t.Plan.Steps {
         step.Status = models.StatusRunning
         t.UpdatedAt = time.Now()
+        step.Inputs = resolveInputs(step.Inputs, resultsByID)
         res, _ := o.Executor.Execute(ctx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
         res.Verified = verified
@@ -142,6 +151,7 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
             return nil
         }
         res.Verified = true
+        resultsByID[step.ID] = res
         if t.Results == nil { t.Results = []*models.Result{} }
         t.Results = append(t.Results, res)
         step.Status = models.StatusSuccess
@@ -150,4 +160,37 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
     t.Status = models.StatusSuccess
     t.UpdatedAt = time.Now()
     return nil
+}
+
+// resolveInputs replaces any string value exactly matching {{step:ID.output}} with the
+// stringified output of that prior step, if available.
+func resolveInputs(inputs map[string]any, resultsByID map[string]*models.Result) map[string]any {
+    if inputs == nil { return nil }
+    out := make(map[string]any, len(inputs))
+    for k, v := range inputs {
+        if s, ok := v.(string); ok {
+            // pattern: {{step:ID.output}}
+            if strings.HasPrefix(s, "{{step:") && strings.HasSuffix(s, ".output}}") {
+                id := strings.TrimSuffix(strings.TrimPrefix(s, "{{step:"), ".output}}")
+                if res, ok := resultsByID[id]; ok && res != nil {
+                    out[k] = stringifyOutput(res.Output)
+                    continue
+                }
+                out[k] = fmt.Sprintf("(missing output from %s)", id)
+                continue
+            }
+        }
+        out[k] = v
+    }
+    return out
+}
+
+func stringifyOutput(v any) string {
+    switch t := v.(type) {
+    case string:
+        return t
+    default:
+        b, _ := json.Marshal(t)
+        return string(b)
+    }
 }

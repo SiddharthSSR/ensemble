@@ -68,16 +68,16 @@ Output ONLY a JSON array of step objects, no prose, no code fences.
 Tools (you MUST stick to these):
 - echo: inputs {"text": string}
 - http_get: inputs {"url": string}
+- summarize: inputs {"text": string}
 
 Rules:
 - Produce 1–3 ordered steps. Prefer 2 steps when helpful.
-- Steps must be self-contained; DO NOT reference outputs of prior steps.
-- Use "deps" to express order (e.g., step2 depends on step1) but avoid dynamic input wiring.
-- If the query contains or implies a URL, first add an http_get step using that URL.
-- After fetching (if applicable), add an echo step that states a concise next action or summary aligned with the user’s goal (use your best judgment, but do not copy unknown fetched content).
+- Use "deps" to express order (e.g., step2 depends on step1).
+- To pass the output of a previous step to a later step, set a string input to the exact template: {{step:ID.output}}
+- If the query contains or implies a URL, first add an http_get step using that URL, then add a summarize step with {"text": "{{step:step1.output}}"} (adjust ID as needed) to produce a concise summary.
 - If there is no URL, use 1–2 echo steps: first restate or clarify the intent; optionally add a second echo suggesting a next action.
 
-Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get", "inputs": { ... }, "deps": ["stepK"]}
+Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"summarize", "inputs": { ... }, "deps": ["stepK"]}
 
 User query: %s
 Context: %v`, task.Query, task.Context)

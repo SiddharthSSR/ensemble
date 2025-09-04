@@ -22,6 +22,8 @@ func init() {
     reg := tools.NewRegistry()
     reg.Register(&tools.EchoTool{})
     reg.Register(&tools.HTTPGetTool{})
+    // LLM-backed summarize tool available when an LLM is configured (falls back to mock if not)
+    reg.Register(&tools.SummarizeTool{Client: llm.NewFromEnv()})
     // Planner selection
     var planner agents.Planner = &agents.MockPlanner{}
     if os.Getenv("USE_LLM_PLANNER") == "1" {

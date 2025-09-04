@@ -9,5 +9,5 @@ import (
 type Client interface {
     GeneratePlan(ctx context.Context, prompt string) (string, error)
     Verify(ctx context.Context, prompt string, output string) (bool, string, error)
+    GenerateText(ctx context.Context, prompt string) (string, error)
 }
-

@@ -29,6 +29,10 @@ func (c *GeminiHTTPClient) Verify(ctx context.Context, prompt string, output str
     return txt != "", txt, nil
 }
 
+func (c *GeminiHTTPClient) GenerateText(ctx context.Context, prompt string) (string, error) {
+    return c.generateText(ctx, prompt)
+}
+
 func (c *GeminiHTTPClient) generateText(ctx context.Context, prompt string) (string, error) {
     endpoint := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", url.PathEscape(c.Model), url.QueryEscape(c.APIKey))
     body := map[string]any{
@@ -60,4 +64,3 @@ func (c *GeminiHTTPClient) generateText(ctx context.Context, prompt string) (str
     }
     return out.Candidates[0].Content.Parts[0].Text, nil
 }
-

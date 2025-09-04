@@ -47,6 +47,21 @@ func (c *AnthropicClient) Verify(ctx context.Context, prompt string, output stri
     return txt != "", txt, nil
 }
 
+func (c *AnthropicClient) GenerateText(ctx context.Context, prompt string) (string, error) {
+    body := map[string]any{
+        "model": c.Model,
+        "max_tokens": 1024,
+        "messages": []map[string]any{{
+            "role": "user",
+            "content": []map[string]string{{"type": "text", "text": prompt}},
+        }},
+    }
+    var resp struct{ Content []struct{ Text string `json:"text"` } `json:"content"` }
+    if err := c.postJSON(ctx, body, &resp); err != nil { return "", err }
+    if len(resp.Content) == 0 { return "", errors.New("no content") }
+    return resp.Content[0].Text, nil
+}
+
 func (c *AnthropicClient) postJSON(ctx context.Context, body any, out any) error {
     b, _ := json.Marshal(body)
     req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(b))
@@ -64,4 +79,3 @@ func (c *AnthropicClient) postJSON(ctx context.Context, body any, out any) error
     }
     return json.NewDecoder(res.Body).Decode(out)
 }
-

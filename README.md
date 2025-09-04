@@ -1,7 +1,7 @@
 # Agent Orchestrator (Go + React)
 
 ## Overview
-Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. LLM integration is provider-agnostic (OpenAI, Anthropic, Gemini via HTTP) with a mock fallback. Tools are pluggable (echo, http_get provided).
+Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. LLM integration is provider-agnostic (OpenAI, Anthropic, Gemini via HTTP) with a mock fallback. Tools are pluggable (echo, http_get, summarize).
 
 ## Flowchart
 ```mermaid
@@ -12,7 +12,7 @@ flowchart TD
   PL -->|Plan JSON| ORCH
   ORCH -->|For each ready step| EXE["Executor"]
   EXE -->|Dispatch| REG["Tool Registry"]
-  REG -->|Run tool| TOOL["Tool (echo, http_get, ...)"]
+  REG -->|Run tool| TOOL["Tool (echo, http_get, summarize)"]
   TOOL -->|Output + Logs| EXE
   EXE --> RES["Result"]
   RES --> VER["Verifier (LLM/Simple)"]
@@ -54,7 +54,8 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - GET `/tasks/{id}` → details (includes plan, steps, results)
 
 ## Notes
-- Planner: rule-based mock. Replace with Gemini client in `internal/providers/gemini` and a real planner in `internal/agents`.
+- Planner: rule-based mock by default; when enabled, planner/verifier use the provider configured under `internal/providers/llm`.
+- Referencing previous outputs: set a string input exactly to `{{step:ID.output}}` to pass a prior step’s output into a later step (e.g., use `summarize` on `http_get` output).
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 
@@ -89,6 +90,7 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 ## Notes
 - Planner: rule-based mock by default; when enabled, planner/verifier use the provider configured under `internal/providers/llm`.
 - Planning/Execution: you can preview steps via `/tasks/plan/{id}` and then run them via `/tasks/execute/{id}`; or do both with `/tasks/start/{id}`.
+- Referencing previous outputs: use `{{step:ID.output}}` as an input value to inject the output string of a prior step (e.g., `summarize` after `http_get`).
 - Safety: tools are whitelisted. No arbitrary code execution.
 - Persistence: in-memory for MVP. Swap with a store if needed.
 

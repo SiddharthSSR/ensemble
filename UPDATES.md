@@ -19,3 +19,15 @@ High-level change log for major refactors and features. Keep bullets concise.
   - Updated `README.md` to document multi-provider support and setup steps.
 - Build verification:
   - Verified `go build ./...` succeeds after refactor.
+
+## 2025-09-04 (later)
+
+- Multi-step planning improvements:
+  - Adjusted LLM planner prompt to encourage http_get → summarize flows and allow referencing prior outputs via `{{step:ID.output}}`.
+- Summarize tool:
+  - Added `tools.SummarizeTool` backed by the configured LLM (`llm.Client.GenerateText`).
+  - Registered in API server so plans can execute summarize steps.
+- Orchestrator input resolution:
+  - Added simple input substitution to map `{{step:ID.output}}` to the stringified output of prior steps.
+  - Applies to both plan+run and execute-existing-plan paths.
+ - Docs updated to mention `summarize` tool and output-referencing template.
