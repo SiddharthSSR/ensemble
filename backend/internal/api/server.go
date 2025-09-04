@@ -13,6 +13,8 @@ import (
     "github.com/example/agent-orchestrator/internal/tools"
     "github.com/example/agent-orchestrator/internal/providers/llm"
     "os"
+    "fmt"
+    "strings"
 )
 
 var orch *orchestrator.Orchestrator
@@ -44,6 +46,34 @@ func RegisterRoutes(mux *http.ServeMux) {
     mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusOK)
         w.Write([]byte("ok"))
+    })
+
+    mux.HandleFunc("/debug/llm", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
+        client := llm.NewFromEnv()
+        // derive provider/model best-effort
+        p := fmt.Sprintf("%T", client)
+        model := ""
+        switch c := client.(type) {
+        case *llm.OpenAIClient:
+            model = c.Model
+            p = "openai"
+        case *llm.AnthropicClient:
+            model = c.Model
+            p = "anthropic"
+        case *llm.GeminiHTTPClient:
+            model = c.Model
+            p = "gemini"
+        default:
+            if strings.Contains(p, "MockClient") { p = "mock" }
+        }
+        // do a quick test
+        ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+        defer cancel()
+        _, err := client.GenerateText(ctx, "ping")
+        resp := map[string]any{"provider": p, "model": model, "ok": err == nil}
+        if err != nil { resp["error"] = err.Error() }
+        respondJSON(w, resp)
     })
 
     mux.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {

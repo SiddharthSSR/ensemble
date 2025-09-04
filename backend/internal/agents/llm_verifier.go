@@ -5,6 +5,8 @@ import (
     "encoding/json"
     "fmt"
     "strings"
+    "log"
+    "os"
 
     "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/providers/llm"
@@ -17,7 +19,12 @@ func (v *LLMVerifier) Verify(ctx context.Context, task *models.Task, step *model
     if res.Error != "" { return false, "execution error" }
     outStr := stringify(res.Output)
     ok, reason, err := v.Client.Verify(ctx, buildVerifyPrompt(task, step), outStr)
-    if err != nil { return false, err.Error() }
+    if err != nil {
+        if os.Getenv("LLM_DEBUG") == "1" {
+            log.Printf("LLMVerifier: verify error: %v", err)
+        }
+        return false, err.Error()
+    }
     // If the model returned JSON, prefer it strictly.
     type verdict struct {
         OK     *bool  `json:"ok"`

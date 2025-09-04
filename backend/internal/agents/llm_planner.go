@@ -5,6 +5,8 @@ import (
     "encoding/json"
     "fmt"
     "strings"
+    "log"
+    "os"
 
     "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/providers/llm"
@@ -25,15 +27,24 @@ func (p *LLMPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan,
     prompt := buildPlanPrompt(task)
     raw, err := p.Client.GeneratePlan(ctx, prompt)
     if err != nil || strings.TrimSpace(raw) == "" {
+        if os.Getenv("LLM_DEBUG") == "1" && err != nil {
+            log.Printf("LLMPlanner: generate error: %v", err)
+        }
         // Fallback to trivial plan
         return trivialPlan(task), nil
     }
     var steps []llmStep
     text := normalizeJSONText(raw)
     if err := json.Unmarshal([]byte(text), &steps); err != nil {
+        if os.Getenv("LLM_DEBUG") == "1" {
+            log.Printf("LLMPlanner: json unmarshal failed, raw=%.200q err=%v", text, err)
+        }
         // Be lenient; sometimes models wrap JSON. Try to extract first [] block.
         if arr := extractJSONArray(text); arr != "" {
             if err2 := json.Unmarshal([]byte(arr), &steps); err2 != nil {
+                if os.Getenv("LLM_DEBUG") == "1" {
+                    log.Printf("LLMPlanner: array extraction also failed: %v", err2)
+                }
                 return trivialPlan(task), nil
             }
         } else {
