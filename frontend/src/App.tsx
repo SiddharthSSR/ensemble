@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type Task = {
   id: string
@@ -29,6 +29,7 @@ export default function App() {
   const [drag, setDrag] = useState(false)
   const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null)
   const [pdfName, setPdfName] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement | null>(null)
 
   function copyText(text: string, key: string) {
     try { navigator.clipboard?.writeText(text) } catch {}
@@ -150,8 +151,6 @@ export default function App() {
       })
       const data: Task = await res.json()
       setQuery('')
-      setPdfDataUrl(null)
-      setPdfName(null)
       setTasks(prev => [data, ...prev])
       setSelected(data)
     } finally { setBusy(false) }
@@ -203,7 +202,7 @@ export default function App() {
           <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Enter query or URL" />
           <button className="btn primary lg" onClick={createTask} disabled={!query || busy}>Create</button>
           <label className="btn secondary md" style={{display:'inline-flex', alignItems:'center', gap:8}}>
-            <input type="file" accept="application/pdf" style={{display:'none'}} onChange={e=>onFileChosen(e.target.files?.[0] as File)} />
+            <input ref={fileRef} type="file" accept="application/pdf" style={{display:'none'}} onChange={e=>{ const f = e.target.files?.[0] as File; if (f) { onFileChosen(f).finally(()=>{ if (fileRef.current) fileRef.current.value=''; }) } }} />
             {uploading ? 'Uploading…' : 'Upload PDF'}
           </label>
         </div>
