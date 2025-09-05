@@ -27,6 +27,8 @@ export default function App() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
+  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null)
+  const [pdfName, setPdfName] = useState<string | null>(null)
 
   function copyText(text: string, key: string) {
     try { navigator.clipboard?.writeText(text) } catch {}
@@ -45,17 +47,12 @@ export default function App() {
         fr.onload = () => resolve(String(fr.result))
         fr.readAsDataURL(file)
       })
-      const ctx = { pdf_data_base64: dataUrl, filename: file.name }
-      const res = await fetch(API('/tasks'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ query: `Uploaded file: ${file.name}`, context: ctx }) })
-      if (!res.ok) throw new Error('Failed to create task')
-      const t: Task = await res.json()
-      setTasks(prev => [t, ...prev])
-      setSelected(t)
-      const st = await fetch(API(`/tasks/start/${t.id}`), { method:'POST' })
-      if (!st.ok) throw new Error('Failed to start task')
+      // Do NOT auto-create or start; just attach to next task creation
+      setPdfDataUrl(dataUrl)
+      setPdfName(file.name)
     } catch (e) {
       console.error(e)
-      alert('Upload or processing failed. Try a smaller PDF or fewer pages.')
+      alert('Upload failed. Try a smaller PDF or fewer pages.')
     } finally { setUploading(false) }
   }
 
@@ -143,12 +140,18 @@ export default function App() {
   async function createTask() {
     setBusy(true)
     try {
+      const body: any = { query }
+      if (pdfDataUrl) {
+        body.context = { pdf_data_base64: pdfDataUrl, filename: pdfName }
+      }
       const res = await fetch(API('/tasks'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
+        body: JSON.stringify(body)
       })
       const data: Task = await res.json()
       setQuery('')
+      setPdfDataUrl(null)
+      setPdfName(null)
       setTasks(prev => [data, ...prev])
       setSelected(data)
     } finally { setBusy(false) }
@@ -205,7 +208,11 @@ export default function App() {
           </label>
         </div>
         <div className={`dropzone ${drag? 'drag':''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-          Drop a PDF here to summarize it
+          {pdfName ? (
+            <span>Attached PDF: <strong>{pdfName}</strong> — will be included when you click Create. <button className="btn ghost sm" onClick={()=>{ setPdfDataUrl(null); setPdfName(null) }}>Clear</button></span>
+          ) : (
+            <span>Drop a PDF here to attach it (won’t auto-run)</span>
+          )}
         </div>
         <div className="toolbar small" style={{justifyContent:'space-between'}}>
           <div className="muted">API: {API_BASE}</div>
