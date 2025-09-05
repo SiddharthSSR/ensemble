@@ -6,6 +6,8 @@ type Task = {
   status: string
   plan?: { steps: Step[] }
   results?: Result[]
+  created_at?: string
+  updated_at?: string
 }
 type Step = { id: string; description: string; tool: string; status: string }
 type Result = { step_id: string; output?: any; logs?: string; verified: boolean; error?: string }
@@ -79,6 +81,16 @@ export default function App() {
 
   const selectedId = selected?.id
   const statusBadge = (s?: string) => <span className={`badge ${s}`}>{s}</span>
+  const sortedTasks = useMemo(() => {
+    const clone = [...tasks]
+    clone.sort((a,b) => {
+      const ta = a.created_at ? Date.parse(a.created_at) : Number(a.id.split('-')[0])
+      const tb = b.created_at ? Date.parse(b.created_at) : Number(b.id.split('-')[0])
+      if (isNaN(tb - ta)) return (b.id > a.id ? 1 : -1)
+      return (tb - ta)
+    })
+    return clone
+  }, [tasks])
 
   return (
     <div className="app">
@@ -108,8 +120,8 @@ export default function App() {
 
         <h2 style={{marginTop:16}}>Tasks</h2>
         <ul className="list">
-          {tasks.map(t => (
-            <li key={t.id} className="item">
+          {sortedTasks.map(t => (
+            <li key={t.id} className={`item ${selectedId===t.id ? 'selected':''}`}>
               <div className="row">
                 <div>
                   <div><strong>{t.query || '(no query)'}</strong></div>

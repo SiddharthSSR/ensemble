@@ -29,7 +29,7 @@
       button:disabled { opacity: .6; cursor: not-allowed; }
       .list { list-style: none; padding: 0; margin: 0; }
       .item { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: var(--panel-2); }
-      .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
       .muted { color: var(--muted); font-size: 12px; }
       .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); }
       .PENDING { background: #1f2937; }
@@ -39,8 +39,9 @@
       .FAILED { background: #4a1010; }
       pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; white-space: pre-wrap; overflow: auto; }
       .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .toolbar { display: flex; gap: 8px; align-items: center; }
+      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .small { font-size: 12px; }
+      .selected { outline: 2px solid var(--primary); }
     </style>
   </head>
   <body>
