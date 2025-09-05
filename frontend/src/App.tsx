@@ -24,6 +24,13 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [llmInfo, setLlmInfo] = useState<any | null>(null)
   const [streaming, setStreaming] = useState<Record<string,string>>({})
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  function copyText(text: string, key: string) {
+    try { navigator.clipboard?.writeText(text) } catch {}
+    setCopiedKey(key)
+    setTimeout(() => setCopiedKey(prev => prev===key ? null : prev), 1500)
+  }
 
   async function refresh() {
     const res = await fetch(API('/tasks'))
@@ -217,12 +224,18 @@ export default function App() {
                 <ul className="list">
                   {selected.plan.steps.map((s:any) => (
                     <li key={s.id} className="item">
-                      <div className="row"><strong>{s.tool}</strong> {statusBadge(s.status)}</div>
+                      <div className="row"><strong>{s.tool}</strong> {statusBadge(s.status)}
+                        {(s.status==='RUNNING' || streaming[s.id]) ? <span className="spinner" aria-label="loading" /> : null}
+                      </div>
                       <div className="muted small">{s.id} — {s.description}</div>
                       {s.inputs ? <pre>{JSON.stringify(s.inputs,null,2)}</pre> : null}
                       {streaming[s.id] ? (
                         <div>
                           <div className="muted small">Live output…</div>
+                          <div className="prebar">
+                            <div className="muted small">stream</div>
+                            <button className="btn ghost sm" onClick={()=>copyText(streaming[s.id], `live-${s.id}`)}>{copiedKey===`live-${s.id}` ? 'Copied!' : 'Copy'}</button>
+                          </div>
                           <pre>{streaming[s.id]}</pre>
                         </div>
                       ): null}
@@ -237,6 +250,10 @@ export default function App() {
                     <li key={i} className="item">
                       <div className="row"><strong>{r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
                       {r.logs ? <div className="muted small">{r.logs}</div> : null}
+                      <div className="prebar">
+                        <div className="muted small">output</div>
+                        <button className="btn ghost sm" onClick={()=>copyText(typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2), `out-${i}`)}>{copiedKey===`out-${i}` ? 'Copied!' : 'Copy'}</button>
+                      </div>
                       <pre>{typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)}</pre>
                     </li>
                   ))}
