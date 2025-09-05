@@ -63,6 +63,14 @@ func (c *AnthropicClient) GenerateText(ctx context.Context, prompt string) (stri
     return resp.Content[0].Text, nil
 }
 
+func (c *AnthropicClient) GenerateTextStream(ctx context.Context, prompt string, onDelta func(chunk string) error) error {
+    // Fallback to non-streaming for now
+    txt, err := c.GenerateText(ctx, prompt)
+    if err != nil { return err }
+    if err := onDelta(txt); err != nil { return err }
+    return nil
+}
+
 func (c *AnthropicClient) postJSON(ctx context.Context, body any, out any) error {
     b, _ := json.Marshal(body)
     url := os.Getenv("ANTHROPIC_API_URL")

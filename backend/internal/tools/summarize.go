@@ -17,8 +17,13 @@ func (s *SummarizeTool) Execute(ctx context.Context, inputs map[string]any) (any
         return nil, "", fmt.Errorf("missing text")
     }
     prompt := fmt.Sprintf("Summarize the following text in a concise way (3-5 bullet points or a short paragraph). Focus on key facts.\n\nText:\n%s", text)
+    if cb, ok := ctx.Value(CtxTokenCallbackKey).(TokenCallback); ok && cb != nil {
+        var acc string
+        err := s.Client.GenerateTextStream(ctx, prompt, func(chunk string) error { acc += chunk; cb(chunk); return nil })
+        if err != nil { return nil, "", err }
+        return acc, "", nil
+    }
     out, err := s.Client.GenerateText(ctx, prompt)
     if err != nil { return nil, "", err }
     return out, "", nil
 }
-

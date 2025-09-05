@@ -11,6 +11,7 @@ import (
 
     "github.com/example/agent-orchestrator/internal/agents"
     "github.com/example/agent-orchestrator/internal/models"
+    "github.com/example/agent-orchestrator/internal/tools"
 )
 
 type Orchestrator struct {
@@ -88,7 +89,11 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
         // resolve input references from prior step outputs
         step.Inputs = resolveInputs(step.Inputs, resultsByID)
-        res, _ := o.Executor.Execute(ctx, step)
+        // attach token streaming callback for LLM tools
+        subCtx := context.WithValue(ctx, tools.CtxTokenCallbackKey, tools.TokenCallback(func(chunk string) {
+            o.hub.Publish(id, Event{Event: "token", TaskID: id, Payload: map[string]any{"step_id": step.ID, "chunk": chunk}})
+        }))
+        res, _ := o.Executor.Execute(subCtx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
         res.Verified = verified
         if !verified || res.Error != "" {
@@ -154,7 +159,10 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
         t.UpdatedAt = time.Now()
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
         step.Inputs = resolveInputs(step.Inputs, resultsByID)
-        res, _ := o.Executor.Execute(ctx, step)
+        subCtx := context.WithValue(ctx, tools.CtxTokenCallbackKey, tools.TokenCallback(func(chunk string) {
+            o.hub.Publish(id, Event{Event: "token", TaskID: id, Payload: map[string]any{"step_id": step.ID, "chunk": chunk}})
+        }))
+        res, _ := o.Executor.Execute(subCtx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
         res.Verified = verified
         if !verified || res.Error != "" {

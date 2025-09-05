@@ -23,6 +23,7 @@ export default function App() {
   const [es, setEs] = useState<EventSource | null>(null)
   const [busy, setBusy] = useState(false)
   const [llmInfo, setLlmInfo] = useState<any | null>(null)
+  const [streaming, setStreaming] = useState<Record<string,string>>({})
 
   async function refresh() {
     const res = await fetch(API('/tasks'))
@@ -79,6 +80,13 @@ export default function App() {
             const results = [...(prev.results||[]), ev.payload]
             return { ...prev, results }
           })
+          // clear streaming buffer for this step
+          setStreaming(prev => { const n={...prev}; delete n[ev.payload?.step_id]; return n })
+        } else if (ev.event === 'token') {
+          const sid = ev.payload?.step_id
+          const ch = ev.payload?.chunk || ''
+          if (!sid || !ch) return
+          setStreaming(prev => ({ ...prev, [sid]: (prev[sid]||'') + ch }))
         }
       } catch {}
     })
@@ -212,6 +220,12 @@ export default function App() {
                       <div className="row"><strong>{s.tool}</strong> {statusBadge(s.status)}</div>
                       <div className="muted small">{s.id} — {s.description}</div>
                       {s.inputs ? <pre>{JSON.stringify(s.inputs,null,2)}</pre> : null}
+                      {streaming[s.id] ? (
+                        <div>
+                          <div className="muted small">Live output…</div>
+                          <pre>{streaming[s.id]}</pre>
+                        </div>
+                      ): null}
                     </li>
                   ))}
                 </ul>

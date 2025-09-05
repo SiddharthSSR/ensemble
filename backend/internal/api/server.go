@@ -132,54 +132,45 @@ func RegisterRoutes(mux *http.ServeMux) {
     })
 
     mux.HandleFunc("/tasks/", func(w http.ResponseWriter, r *http.Request) {
-        // path: /tasks/{id}
+        // Handle both JSON task fetch and SSE stream under /tasks/{id} and /tasks/{id}/events
         if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
+        if strings.HasSuffix(r.URL.Path, "/events") {
+            id := strings.TrimSuffix(r.URL.Path[len("/tasks/"):], "/events")
+            // set SSE headers
+            w.Header().Set("Content-Type", "text/event-stream")
+            w.Header().Set("Cache-Control", "no-cache")
+            w.Header().Set("Connection", "keep-alive")
+            flusher, ok := w.(http.Flusher)
+            if !ok { http.Error(w, "stream unsupported", http.StatusInternalServerError); return }
+            ch, unsub := orch.Subscribe(id)
+            defer unsub()
+            if t, ok := orch.GetTask(id); ok {
+                b, _ := json.Marshal(t)
+                writeSSE(w, "snapshot", b)
+                flusher.Flush()
+            }
+            ticker := time.NewTicker(20 * time.Second)
+            defer ticker.Stop()
+            notify := r.Context().Done()
+            for {
+                select {
+                case <-notify:
+                    return
+                case msg, ok := <-ch:
+                    if !ok { return }
+                    writeSSE(w, "update", msg)
+                    flusher.Flush()
+                case <-ticker.C:
+                    w.Write([]byte(": ping\n\n"))
+                    flusher.Flush()
+                }
+            }
+        }
+        // JSON task fetch: /tasks/{id}
         id := r.URL.Path[len("/tasks/"):]
         t, ok := orch.GetTask(id)
         if !ok { http.NotFound(w, r); return }
         respondJSON(w, t)
-    })
-
-    // Server-Sent Events: /tasks/{id}/events
-    mux.HandleFunc("/tasks/", func(w http.ResponseWriter, r *http.Request) {
-        // detect SSE by suffix
-        if !strings.HasSuffix(r.URL.Path, "/events") || r.Method != http.MethodGet {
-            return
-        }
-        id := strings.TrimSuffix(r.URL.Path[len("/tasks/"):], "/events")
-        // set SSE headers
-        w.Header().Set("Content-Type", "text/event-stream")
-        w.Header().Set("Cache-Control", "no-cache")
-        w.Header().Set("Connection", "keep-alive")
-        flusher, ok := w.(http.Flusher)
-        if !ok { http.Error(w, "stream unsupported", http.StatusInternalServerError); return }
-        // subscribe
-        ch, unsub := orch.Subscribe(id)
-        defer unsub()
-        // initial event: current task snapshot, if exists
-        if t, ok := orch.GetTask(id); ok {
-            b, _ := json.Marshal(t)
-            writeSSE(w, "snapshot", b)
-            flusher.Flush()
-        }
-        // heartbeat ticker
-        ticker := time.NewTicker(20 * time.Second)
-        defer ticker.Stop()
-        // stream loop
-        notify := r.Context().Done()
-        for {
-            select {
-            case <-notify:
-                return
-            case msg, ok := <-ch:
-                if !ok { return }
-                writeSSE(w, "update", msg)
-                flusher.Flush()
-            case <-ticker.C:
-                w.Write([]byte(": ping\n\n"))
-                flusher.Flush()
-            }
-        }
     })
 }
 

@@ -25,6 +25,12 @@ func (m *MockClient) GenerateText(ctx context.Context, prompt string) (string, e
     return "(mock) " + truncate(strings.TrimSpace(prompt), 200), nil
 }
 
+func (m *MockClient) GenerateTextStream(ctx context.Context, prompt string, onDelta func(chunk string) error) error {
+    out, _ := m.GenerateText(ctx, prompt)
+    _ = onDelta(out)
+    return nil
+}
+
 func truncate(s string, n int) string {
     if len(s) <= n { return s }
     return s[:n] + "..."

@@ -20,8 +20,13 @@ func (t *LLMAnswerTool) Execute(ctx context.Context, inputs map[string]any) (any
     inst, _ := inputs["instructions"].(string)
     prompt := q
     if inst != "" { prompt = inst + "\n\nQuestion:\n" + q }
+    if cb, ok := ctx.Value(CtxTokenCallbackKey).(TokenCallback); ok && cb != nil {
+        var acc string
+        err := t.Client.GenerateTextStream(ctx, prompt, func(chunk string) error { acc += chunk; cb(chunk); return nil })
+        if err != nil { return nil, "", err }
+        return acc, "", nil
+    }
     ans, err := t.Client.GenerateText(ctx, prompt)
     if err != nil { return nil, "", err }
     return ans, "", nil
 }
-

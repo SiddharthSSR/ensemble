@@ -34,6 +34,13 @@ func (c *GeminiHTTPClient) GenerateText(ctx context.Context, prompt string) (str
     return c.generateText(ctx, prompt)
 }
 
+func (c *GeminiHTTPClient) GenerateTextStream(ctx context.Context, prompt string, onDelta func(chunk string) error) error {
+    txt, err := c.generateText(ctx, prompt)
+    if err != nil { return err }
+    if err := onDelta(txt); err != nil { return err }
+    return nil
+}
+
 func (c *GeminiHTTPClient) generateText(ctx context.Context, prompt string) (string, error) {
     endpoint := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", url.PathEscape(c.Model), url.QueryEscape(c.APIKey))
     body := map[string]any{
