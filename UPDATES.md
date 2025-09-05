@@ -42,3 +42,16 @@ High-level change log for major refactors and features. Keep bullets concise.
   - Now recommends URL flow: http_get → html_to_text → summarize; and uses llm_answer for direct questions.
 - Docs:
   - Added examples for the new tools in README.
+
+## 2025-09-05
+
+- UI polishing:
+  - Dark theme, status badges, button priority (primary/secondary/ghost; lg/md/sm), ellipsis for long task titles, selected-task highlight.
+  - LLM debug panel shows provider/model/health; added Plan/Execute controls and auto-refresh toggle.
+- Planner defaults & precedence:
+  - Non-URL queries now default to `llm_answer` (instead of `echo`).
+  - URL queries default to a 3-step chain: `http_get` → `html_to_text` → `summarize`.
+- LLM robustness:
+  - Added `LLM_HTTP_TIMEOUT_MS`, simple retries/backoff, and provider base URL overrides (`OPENAI_API_BASE`, `ANTHROPIC_API_URL`, `GEMINI_API_URL`).
+- Debugging:
+  - `/debug/llm` endpoint to diagnose provider/model connectivity.

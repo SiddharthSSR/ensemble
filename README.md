@@ -101,15 +101,35 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
   - `PORT`, `USE_LLM_PLANNER`, `USE_LLM_VERIFIER`, `LLM_PROVIDER`, `LLM_MODEL`, and provider API key.
 
 ## TODO
-- Orchestrator: per-step timeouts, retries with backoff, and cancellation.
-- Persistence: store tasks/plans/results in SQLite with a simple repository.
-- Live updates: SSE endpoint `/tasks/{id}/events` for streaming logs/status.
-- LLM hardening: JSON schema enforcement and robust parsing for planner/verifier.
-- Tools: add shell sandbox, file ops, and HTTP POST/JSON tools; registry config.
-- Auth: API keys or token-based auth for write endpoints.
-- Frontend: subscribe to SSE, improve task detail UI, and error states.
-- Reverse proxy: optional Nginx to serve frontend and proxy `/api` to backend.
-- Tests: unit tests for agents/tools and integration tests for orchestration.
+Roadmap of next improvements.
+
+- Orchestrator & Exec
+  - Per-step timeouts (configurable), retries with backoff + jitter, and cancellation.
+  - Step-level streaming logs via SSE (`/tasks/{id}/events`), frontend live progress.
+  - Better error surfaces to UI (toasts/badges) and retry buttons for failed steps.
+- Persistence
+  - SQLite store for tasks/plans/results with pagination and pruning.
+  - Migrations and repository abstraction.
+- LLM layer
+  - Enforce JSON schema for planner output (JSON mode) and strict parsing.
+  - Model fallback ordering and temperature/params via env.
+  - Streaming `GenerateText` outputs for summarize/llm_answer.
+- Tools
+  - regex_extract, html_extract (goquery), json_query (gjson), http_head/get_with_headers.
+  - webhook_post; optional search_web (SerpAPI/Brave/Bing) with sources flow.
+  - Shell/file sandbox tools with allowlist and size limits.
+- Security & Config
+  - Domain allowlist for HTTP tools; max response size and content-type filters.
+  - Backend auth token for write endpoints; simple rate limiting.
+  - Central config (env + file) with validation and docs.
+- Frontend
+  - Sticky sidebar with its own scroll; status filters and search.
+  - Collapsible results, copy-to-clipboard, plan templates dropdown.
+  - Better mobile layout and keyboard shortcuts.
+- Dev Experience
+  - Dockerfiles + docker-compose for backend/frontend.
+  - CI: lint, unit/integration tests; release notes.
+  - CLI utility to create/plan/execute tasks from terminal.
 
 ## Notes
 - Planner: rule-based mock by default; when enabled, planner/verifier use the provider configured under `internal/providers/llm`.
