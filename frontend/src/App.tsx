@@ -26,6 +26,7 @@ export default function App() {
   const [streaming, setStreaming] = useState<Record<string,string>>({})
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [drag, setDrag] = useState(false)
 
   function copyText(text: string, key: string) {
     try { navigator.clipboard?.writeText(text) } catch {}
@@ -46,6 +47,18 @@ export default function App() {
       setSelected(t)
       await fetch(API(`/tasks/start/${t.id}`), { method:'POST' })
     } finally { setUploading(false) }
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault(); e.stopPropagation(); setDrag(true)
+  }
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault(); e.stopPropagation(); setDrag(false)
+  }
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault(); e.stopPropagation(); setDrag(false)
+    const f = e.dataTransfer?.files?.[0]
+    if (f && f.type === 'application/pdf') { onFileChosen(f) }
   }
 
   async function refresh() {
@@ -180,6 +193,9 @@ export default function App() {
             <input type="file" accept="application/pdf" style={{display:'none'}} onChange={e=>onFileChosen(e.target.files?.[0] as File)} />
             {uploading ? 'Uploading…' : 'Upload PDF'}
           </label>
+        </div>
+        <div className={`dropzone ${drag? 'drag':''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+          Drop a PDF here to summarize it
         </div>
         <div className="toolbar small" style={{justifyContent:'space-between'}}>
           <div className="muted">API: {API_BASE}</div>
