@@ -17,7 +17,7 @@ func NewFromEnv() Client {
     switch prov {
     case "openai":
         if key := strings.TrimSpace(os.Getenv("OPENAI_API_KEY")); key != "" {
-            return &OpenAIClient{APIKey: key, Model: getModelWithDefault("LLM_MODEL", "gpt-4o-mini")} // default lightweight
+            return &OpenAIClient{APIKey: key, Model: getModelWithDefault("LLM_MODEL", "gpt-4o-mini"), BaseURL: strings.TrimRight(os.Getenv("OPENAI_API_BASE"), "/")} // default lightweight
         }
     case "anthropic":
         if key := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); key != "" {
@@ -32,7 +32,7 @@ func NewFromEnv() Client {
 
     // Auto-detect by API key presence if provider not specified
     if key := strings.TrimSpace(os.Getenv("OPENAI_API_KEY")); key != "" {
-        return &OpenAIClient{APIKey: key, Model: getModelWithDefault("LLM_MODEL", "gpt-4o-mini")}
+        return &OpenAIClient{APIKey: key, Model: getModelWithDefault("LLM_MODEL", "gpt-4o-mini"), BaseURL: strings.TrimRight(os.Getenv("OPENAI_API_BASE"), "/")}
     }
     if key := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); key != "" {
         return &AnthropicClient{APIKey: key, Model: getModelWithDefault("LLM_MODEL", "claude-3-5-sonnet-latest")}
@@ -48,4 +48,3 @@ func getModelWithDefault(envKey, def string) string {
     if v := strings.TrimSpace(os.Getenv(envKey)); v != "" { return v }
     return def
 }
-

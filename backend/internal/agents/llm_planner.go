@@ -85,15 +85,18 @@ Tools (you MUST stick to these):
 - html_to_text: inputs {"html": string}
 - summarize: inputs {"text": string}
 - llm_answer: inputs {"text": string}
+ - http_post_json: inputs {"url": string, "json": any}
 
 Rules:
 - Produce 1–3 ordered steps. Prefer 2 steps when helpful.
 - Use "deps" to express order (e.g., step2 depends on step1).
 - To pass the output of a previous step to a later step, set a string input to the exact template: {{step:ID.output}}
 - If the query contains or implies a URL, plan: (1) http_get(url) -> (2) html_to_text(html="{{step:step1.output}}") -> (3) summarize(text="{{step:step2.output}}").
-- If there is no URL (a direct question), use a single llm_answer step with {"text": "<the query>"}.
+- If the query starts with "summarize:" or "summarise:", use a single summarize step with {"text": "<rest of query>"}.
+- If the query suggests calling a JSON API (mentions POST/JSON/payload) and includes a URL and a simple JSON object, use a single http_post_json step with that URL and JSON.
+- If there is no URL and it is a direct question, use a single llm_answer step with {"text": "<the query>"}.
 
-Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer", "inputs": { ... }, "deps": ["stepK"]}
+Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer"|"http_post_json", "inputs": { ... }, "deps": ["stepK"]}
 
 User query: %s
 Context: %v`, task.Query, task.Context)

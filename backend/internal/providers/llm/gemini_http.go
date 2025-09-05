@@ -8,7 +8,8 @@ import (
     "fmt"
     "net/http"
     "net/url"
-    "time"
+    "os"
+    "strings"
 )
 
 type GeminiHTTPClient struct {
@@ -42,9 +43,13 @@ func (c *GeminiHTTPClient) generateText(ctx context.Context, prompt string) (str
         }},
     }
     b, _ := json.Marshal(body)
+    // allow override via GEMINI_API_URL base
+    if base := os.Getenv("GEMINI_API_URL"); base != "" {
+        endpoint = fmt.Sprintf("%s/models/%s:generateContent?key=%s", strings.TrimRight(base, "/"), url.PathEscape(c.Model), url.QueryEscape(c.APIKey))
+    }
     req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(b))
     req.Header.Set("content-type", "application/json")
-    httpClient := &http.Client{Timeout: 30 * time.Second}
+    httpClient := &http.Client{Timeout: clientTimeout()}
     res, err := httpClient.Do(req)
     if err != nil { return "", err }
     defer res.Body.Close()

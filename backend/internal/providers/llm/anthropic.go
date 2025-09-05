@@ -7,6 +7,7 @@ import (
     "errors"
     "fmt"
     "net/http"
+    "os"
     "time"
 )
 
@@ -64,18 +65,29 @@ func (c *AnthropicClient) GenerateText(ctx context.Context, prompt string) (stri
 
 func (c *AnthropicClient) postJSON(ctx context.Context, body any, out any) error {
     b, _ := json.Marshal(body)
-    req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(b))
+    url := os.Getenv("ANTHROPIC_API_URL")
+    if url == "" { url = "https://api.anthropic.com/v1/messages" }
+    req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
     req.Header.Set("x-api-key", c.APIKey)
     req.Header.Set("anthropic-version", "2023-06-01")
     req.Header.Set("content-type", "application/json")
-    httpClient := &http.Client{Timeout: 30 * time.Second}
-    res, err := httpClient.Do(req)
-    if err != nil { return err }
-    defer res.Body.Close()
-    if res.StatusCode < 200 || res.StatusCode >= 300 {
+    httpClient := &http.Client{Timeout: clientTimeout()}
+    var lastErr error
+    for attempt := 0; attempt < 3; attempt++ {
+        res, err := httpClient.Do(req.Clone(ctx))
+        if err != nil { lastErr = err; if isTimeout(err) { time.Sleep(backoff(attempt)); continue }; return err }
+        defer res.Body.Close()
+        if res.StatusCode >= 200 && res.StatusCode < 300 {
+            return json.NewDecoder(res.Body).Decode(out)
+        }
         var eresp map[string]any
         _ = json.NewDecoder(res.Body).Decode(&eresp)
-        return fmt.Errorf("anthropic status %d: %v", res.StatusCode, eresp)
+        lastErr = fmt.Errorf("anthropic status %d: %v", res.StatusCode, eresp)
+        if res.StatusCode == 408 || res.StatusCode == 429 || (res.StatusCode >= 500 && res.StatusCode <= 599) {
+            time.Sleep(backoff(attempt));
+            continue
+        }
+        return lastErr
     }
-    return json.NewDecoder(res.Body).Decode(out)
+    return lastErr
 }
