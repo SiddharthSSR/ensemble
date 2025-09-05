@@ -39,17 +39,20 @@ func (p *LLMPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan,
         if os.Getenv("LLM_DEBUG") == "1" {
             log.Printf("LLMPlanner: json unmarshal failed, raw=%.200q err=%v", text, err)
         }
-        // Be lenient; sometimes models wrap JSON. Try to extract first [] block.
+        // Try extracting first [] array
         if arr := extractJSONArray(text); arr != "" {
             if err2 := json.Unmarshal([]byte(arr), &steps); err2 != nil {
-                if os.Getenv("LLM_DEBUG") == "1" {
-                    log.Printf("LLMPlanner: array extraction also failed: %v", err2)
-                }
-                return trivialPlan(task), nil
+                if os.Getenv("LLM_DEBUG") == "1" { log.Printf("LLMPlanner: array extraction also failed: %v", err2) }
             }
-        } else {
-            return trivialPlan(task), nil
         }
+        // Try wrapper object {"steps": [...]}
+        if len(steps) == 0 {
+            var wrapper struct{ Steps []llmStep `json:"steps"` }
+            if err3 := json.Unmarshal([]byte(text), &wrapper); err3 == nil && len(wrapper.Steps) > 0 {
+                steps = wrapper.Steps
+            }
+        }
+        if len(steps) == 0 { return trivialPlan(task), nil }
     }
     if len(steps) == 0 {
         return trivialPlan(task), nil
