@@ -97,7 +97,9 @@ Rules:
 - If there is no URL and it is a direct question, use a single llm_answer step with {"text": "<the query>"}.
 
 Special context:
-- If task context contains 'pdf_data_base64', plan: (1) pdf_extract(data_base64 from context) -> (2) summarize(text from step1).
+- If task context contains 'pdf_data_base64':
+  - If the query mentions "summarize"/"summarise": (1) pdf_extract(data_base64 from context) -> (2) summarize(text from step1).
+  - Otherwise: (1) pdf_extract(data_base64 from context) -> (2) llm_answer(text="<the query>", instructions="Use the following PDF content as context.\n\nContext:\n{{step:step1.output}}" ).
 
 Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer"|"http_post_json"|"pdf_extract", "inputs": { ... }, "deps": ["stepK"]}
 
