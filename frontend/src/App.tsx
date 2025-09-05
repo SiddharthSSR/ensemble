@@ -98,7 +98,7 @@ export default function App() {
         <h2>New Task</h2>
         <div className="toolbar" style={{marginBottom:8}}>
           <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Enter query or URL" />
-          <button className="primary" onClick={createTask} disabled={!query || busy}>Create</button>
+          <button className="btn primary lg" onClick={createTask} disabled={!query || busy}>Create</button>
         </div>
         <div className="toolbar small" style={{justifyContent:'space-between'}}>
           <div className="muted">API: {API_BASE}</div>
@@ -107,7 +107,7 @@ export default function App() {
         <div className="card" style={{marginTop:12}}>
           <div className="row" style={{marginBottom:8}}>
             <h2 style={{margin:0}}>LLM</h2>
-            <button onClick={fetchLLM}>Refresh</button>
+            <button className="btn ghost sm" onClick={fetchLLM}>Refresh</button>
           </div>
           {!llmInfo ? <div className="muted small">Loading…</div> : (
             <div className="small">
@@ -123,16 +123,16 @@ export default function App() {
           {sortedTasks.map(t => (
             <li key={t.id} className={`item ${selectedId===t.id ? 'selected':''}`}>
               <div className="row">
-                <div>
-                  <div><strong>{t.query || '(no query)'}</strong></div>
+                <div className="name" style={{flex:1}}>
+                  <div className="ellipsis title">{t.query || '(no query)'}</div>
                   <div className="muted">{t.id}</div>
                 </div>
                 <div className="toolbar">
                   {statusBadge(t.status)}
-                  <button onClick={() => planTask(t.id)} disabled={busy}>Plan</button>
-                  <button onClick={() => executeTask(t.id)} disabled={busy || t.status==='RUNNING'}>Execute</button>
-                  <button onClick={() => startTask(t.id)} disabled={busy || t.status==='RUNNING'}>Start</button>
-                  <button onClick={() => setSelected(t)}>Open</button>
+                  <button className="btn ghost sm" onClick={() => planTask(t.id)} disabled={busy}>Plan</button>
+                  <button className="btn secondary md" onClick={() => executeTask(t.id)} disabled={busy || t.status==='RUNNING'}>Execute</button>
+                  <button className="btn primary lg" onClick={() => startTask(t.id)} disabled={busy || t.status==='RUNNING'}>Start</button>
+                  <button className="btn ghost sm" onClick={() => setSelected(t)}>Open</button>
                 </div>
               </div>
             </li>
@@ -152,9 +152,9 @@ export default function App() {
               <div className="small muted">Query</div>
               <div style={{marginBottom:8, wordBreak:'break-word'}}>{selected.query}</div>
               <div className="toolbar" style={{gap:8}}>
-                <button onClick={()=> planTask(selectedId!)} disabled={busy}>Plan</button>
-                <button onClick={()=> executeTask(selectedId!)} disabled={busy}>Execute</button>
-                <button onClick={()=> startTask(selectedId!)} disabled={busy}>Start</button>
+                <button className="btn ghost sm" onClick={()=> planTask(selectedId!)} disabled={busy}>Plan</button>
+                <button className="btn secondary md" onClick={()=> executeTask(selectedId!)} disabled={busy}>Execute</button>
+                <button className="btn primary lg" onClick={()=> startTask(selectedId!)} disabled={busy}>Start</button>
               </div>
             </div>
             <div>
@@ -175,7 +175,7 @@ export default function App() {
                 <ul className="list">
                   {selected.results.map((r:any,i:number) => (
                     <li key={i} className="item">
-                      <div className="row"><strong>step {r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
+                      <div className="row"><strong>{r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
                       {r.logs ? <div className="muted small">{r.logs}</div> : null}
                       <pre>{typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)}</pre>
                     </li>

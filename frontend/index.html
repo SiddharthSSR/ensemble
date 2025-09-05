@@ -25,7 +25,13 @@
       input, button, textarea { font: inherit; color: inherit; }
       input, textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text); }
       button { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
-      button.primary { background: var(--primary); border-color: transparent; color: white; }
+      .btn { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+      .btn.primary { background: var(--primary); border-color: transparent; color: white; }
+      .btn.secondary { background: #243244; border-color: #2b3645; color: #e3e6eb; }
+      .btn.ghost { background: transparent; border-color: var(--border); color: var(--text); }
+      .btn.sm { padding: 6px 8px; font-size: 12px; }
+      .btn.md { padding: 8px 12px; font-size: 14px; }
+      .btn.lg { padding: 10px 14px; font-size: 14px; font-weight: 600; }
       button:disabled { opacity: .6; cursor: not-allowed; }
       .list { list-style: none; padding: 0; margin: 0; }
       .item { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: var(--panel-2); }
@@ -42,6 +48,9 @@
       .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .small { font-size: 12px; }
       .selected { outline: 2px solid var(--primary); }
+      .name { min-width: 0; }
+      .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .title { font-weight: 600; }
     </style>
   </head>
   <body>
