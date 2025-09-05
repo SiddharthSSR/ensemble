@@ -139,6 +139,48 @@ func RegisterRoutes(mux *http.ServeMux) {
         if !ok { http.NotFound(w, r); return }
         respondJSON(w, t)
     })
+
+    // Server-Sent Events: /tasks/{id}/events
+    mux.HandleFunc("/tasks/", func(w http.ResponseWriter, r *http.Request) {
+        // detect SSE by suffix
+        if !strings.HasSuffix(r.URL.Path, "/events") || r.Method != http.MethodGet {
+            return
+        }
+        id := strings.TrimSuffix(r.URL.Path[len("/tasks/"):], "/events")
+        // set SSE headers
+        w.Header().Set("Content-Type", "text/event-stream")
+        w.Header().Set("Cache-Control", "no-cache")
+        w.Header().Set("Connection", "keep-alive")
+        flusher, ok := w.(http.Flusher)
+        if !ok { http.Error(w, "stream unsupported", http.StatusInternalServerError); return }
+        // subscribe
+        ch, unsub := orch.Subscribe(id)
+        defer unsub()
+        // initial event: current task snapshot, if exists
+        if t, ok := orch.GetTask(id); ok {
+            b, _ := json.Marshal(t)
+            writeSSE(w, "snapshot", b)
+            flusher.Flush()
+        }
+        // heartbeat ticker
+        ticker := time.NewTicker(20 * time.Second)
+        defer ticker.Stop()
+        // stream loop
+        notify := r.Context().Done()
+        for {
+            select {
+            case <-notify:
+                return
+            case msg, ok := <-ch:
+                if !ok { return }
+                writeSSE(w, "update", msg)
+                flusher.Flush()
+            case <-ticker.C:
+                w.Write([]byte(": ping\n\n"))
+                flusher.Flush()
+            }
+        }
+    })
 }
 
 func respondJSON(w http.ResponseWriter, v any) {
@@ -146,6 +188,14 @@ func respondJSON(w http.ResponseWriter, v any) {
     enc := json.NewEncoder(w)
     enc.SetIndent("", "  ")
     enc.Encode(v)
+}
+
+func writeSSE(w http.ResponseWriter, event string, data []byte) {
+    w.Write([]byte("event: "+event+"\n"))
+    // ensure single-line data chunks by JSON encoding beforehand
+    w.Write([]byte("data: "))
+    w.Write(data)
+    w.Write([]byte("\n\n"))
 }
 
 func genID() string {

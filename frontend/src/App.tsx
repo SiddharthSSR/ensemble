@@ -20,6 +20,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Task | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [es, setEs] = useState<EventSource | null>(null)
   const [busy, setBusy] = useState(false)
   const [llmInfo, setLlmInfo] = useState<any | null>(null)
 
@@ -39,6 +40,51 @@ export default function App() {
     const t = setInterval(refresh, 1500)
     return () => clearInterval(t)
   }, [autoRefresh, selected])
+
+  // Subscribe to SSE for the selected task
+  useEffect(() => {
+    es?.close()
+    setEs(null)
+    if (!selected) return
+    const src = new EventSource(API(`/tasks/${selected.id}/events`))
+    src.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data?.plan || data?.steps) {
+          // snapshot case not used now
+        }
+      } catch {}
+    }
+    src.addEventListener('snapshot', (e:any) => {
+      try { setSelected(JSON.parse(e.data)) } catch {}
+    })
+    src.addEventListener('update', (e:any) => {
+      try {
+        const ev = JSON.parse(e.data)
+        if (!ev || !ev.event) return
+        if (ev.event === 'task_status') {
+          setSelected(prev => prev && prev.id===ev.task_id ? { ...prev, status: ev.payload?.status || prev.status } : prev)
+          setTasks(prev => prev.map(t => t.id===ev.task_id ? { ...t, status: ev.payload?.status || t.status } : t))
+        } else if (ev.event === 'plan') {
+          setSelected(prev => prev && prev.id===ev.task_id ? { ...prev, plan: ev.payload } : prev)
+        } else if (ev.event === 'step_status') {
+          setSelected(prev => {
+            if (!prev || prev.id!==ev.task_id) return prev
+            const steps = prev.plan?.steps?.map((s:any) => s.id===ev.payload?.id ? { ...s, status: ev.payload?.status } : s)
+            return { ...prev, plan: prev.plan ? { ...prev.plan, steps } : prev.plan }
+          })
+        } else if (ev.event === 'result') {
+          setSelected(prev => {
+            if (!prev || prev.id!==ev.task_id) return prev
+            const results = [...(prev.results||[]), ev.payload]
+            return { ...prev, results }
+          })
+        }
+      } catch {}
+    })
+    setEs(src)
+    return () => { src.close() }
+  }, [selected?.id])
 
   async function createTask() {
     setBusy(true)

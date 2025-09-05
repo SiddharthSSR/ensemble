@@ -53,6 +53,7 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
 - POST `/tasks/start/{id}` → plan + execute (full flow)
 - GET `/tasks` → list
 - GET `/tasks/{id}` → details (includes plan, steps, results)
+- GET `/tasks/{id}/events` → Server-Sent Events stream of live updates (task/step status, plan, results)
 
 ## Notes
 - Planner: rule-based mock by default; when enabled, planner/verifier use the provider configured under `internal/providers/llm`.
@@ -105,7 +106,7 @@ Roadmap of next improvements.
 
 - Orchestrator & Exec
   - Per-step timeouts (configurable), retries with backoff + jitter, and cancellation.
-  - Step-level streaming logs via SSE (`/tasks/{id}/events`), frontend live progress.
+  - Step-level streaming logs via SSE (`/tasks/{id}/events`), frontend live progress. [added basic SSE status/results events]
   - Better error surfaces to UI (toasts/badges) and retry buttons for failed steps.
 - Persistence
   - SQLite store for tasks/plans/results with pagination and pruning.

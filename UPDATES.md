@@ -55,3 +55,7 @@ High-level change log for major refactors and features. Keep bullets concise.
   - Added `LLM_HTTP_TIMEOUT_MS`, simple retries/backoff, and provider base URL overrides (`OPENAI_API_BASE`, `ANTHROPIC_API_URL`, `GEMINI_API_URL`).
 - Debugging:
   - `/debug/llm` endpoint to diagnose provider/model connectivity.
+
+- Live updates (SSE):
+  - Added in-memory event hub and `/tasks/{id}/events` endpoint for Server-Sent Events.
+  - Streams: task status changes, plan snapshot, step status updates, and results.

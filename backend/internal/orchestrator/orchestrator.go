@@ -20,6 +20,8 @@ type Orchestrator struct {
 
     tasksMu sync.RWMutex
     tasks   map[string]*models.Task
+
+    hub *Hub
 }
 
 func New(planner agents.Planner, executor agents.Executor, verifier agents.Verifier) *Orchestrator {
@@ -28,6 +30,7 @@ func New(planner agents.Planner, executor agents.Executor, verifier agents.Verif
         Executor: executor,
         Verifier: verifier,
         tasks:    map[string]*models.Task{},
+        hub:      NewHub(),
     }
 }
 
@@ -36,6 +39,7 @@ func (o *Orchestrator) CreateTask(id string, query string, contextMap map[string
     o.tasksMu.Lock()
     o.tasks[id] = t
     o.tasksMu.Unlock()
+    o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
     return t
 }
 
@@ -63,21 +67,25 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
     }
     t.Status = models.StatusRunning
     t.UpdatedAt = time.Now()
+    o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
 
     // Plan
     plan, err := o.Planner.Plan(ctx, t)
     if err != nil {
         t.Status = models.StatusFailed
         t.UpdatedAt = time.Now()
+        o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status, "error": err.Error()}})
         return err
     }
     t.Plan = plan
+    o.hub.Publish(id, Event{Event: "plan", TaskID: id, Payload: plan})
 
     // Sequential execution MVP
     resultsByID := map[string]*models.Result{}
     for _, step := range plan.Steps {
         step.Status = models.StatusRunning
         t.UpdatedAt = time.Now()
+        o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
         // resolve input references from prior step outputs
         step.Inputs = resolveInputs(step.Inputs, resultsByID)
         res, _ := o.Executor.Execute(ctx, step)
@@ -89,6 +97,9 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
             t.Results = append(t.Results, res)
             t.Status = models.StatusFailed
             t.UpdatedAt = time.Now()
+            o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+            o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
+            o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
             return nil
         }
         res.Verified = true
@@ -97,10 +108,13 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
         t.Results = append(t.Results, res)
         step.Status = models.StatusSuccess
         t.UpdatedAt = time.Now()
+        o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+        o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
     }
 
     t.Status = models.StatusSuccess
     t.UpdatedAt = time.Now()
+    o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
     return nil
 }
 
@@ -138,6 +152,7 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
     for _, step := range t.Plan.Steps {
         step.Status = models.StatusRunning
         t.UpdatedAt = time.Now()
+        o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
         step.Inputs = resolveInputs(step.Inputs, resultsByID)
         res, _ := o.Executor.Execute(ctx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
@@ -148,6 +163,9 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
             t.Results = append(t.Results, res)
             t.Status = models.StatusFailed
             t.UpdatedAt = time.Now()
+            o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+            o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
+            o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
             return nil
         }
         res.Verified = true
@@ -156,10 +174,20 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
         t.Results = append(t.Results, res)
         step.Status = models.StatusSuccess
         t.UpdatedAt = time.Now()
+        o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+        o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
     }
     t.Status = models.StatusSuccess
     t.UpdatedAt = time.Now()
+    o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
     return nil
+}
+
+// Subscribe returns a channel carrying JSON-encoded Event payloads for a specific task.
+// The caller must call the returned unsubscribe func when done.
+func (o *Orchestrator) Subscribe(taskID string) (<-chan []byte, func()) {
+    ch, unsub := o.hub.Subscribe(taskID)
+    return ch, unsub
 }
 
 // resolveInputs replaces any string value exactly matching {{step:ID.output}} with the
