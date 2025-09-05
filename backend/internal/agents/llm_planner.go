@@ -105,18 +105,38 @@ Context: %v`, task.Query, task.Context)
 func trivialPlan(task *models.Task) *models.Plan {
     lower := strings.ToLower(task.Query)
     if strings.Contains(lower, "http") || strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
-        return &models.Plan{Steps: []*models.Step{{
-            ID:          "step1",
-            Description: "HTTP GET a URL",
-            Tool:        "http_get",
-            Inputs:      map[string]any{"url": task.Query},
-            Status:      models.StatusPending,
-        }}}
+        // Prefer a useful 3-step flow for URLs even if LLM output parsing fails
+        return &models.Plan{Steps: []*models.Step{
+            {
+                ID:          "step1",
+                Description: "HTTP GET a URL",
+                Tool:        "http_get",
+                Inputs:      map[string]any{"url": task.Query},
+                Status:      models.StatusPending,
+            },
+            {
+                ID:          "step2",
+                Description: "Convert HTML to text",
+                Tool:        "html_to_text",
+                Inputs:      map[string]any{"html": "{{step:step1.output}}"},
+                Deps:        []string{"step1"},
+                Status:      models.StatusPending,
+            },
+            {
+                ID:          "step3",
+                Description: "Summarize content",
+                Tool:        "summarize",
+                Inputs:      map[string]any{"text": "{{step:step2.output}}"},
+                Deps:        []string{"step2"},
+                Status:      models.StatusPending,
+            },
+        }}
     }
+    // For non-URL questions, prefer direct LLM answer over echo
     return &models.Plan{Steps: []*models.Step{{
         ID:          "step1",
-        Description: "Echo the query",
-        Tool:        "echo",
+        Description: "Answer with LLM",
+        Tool:        "llm_answer",
         Inputs:      map[string]any{"text": task.Query},
         Status:      models.StatusPending,
     }}}
