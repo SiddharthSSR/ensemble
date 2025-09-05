@@ -16,6 +16,25 @@ type MockPlanner struct{}
 
 func (m *MockPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan, error) {
     q := strings.ToLower(task.Query)
+    if b64, ok := task.Context["pdf_data_base64"].(string); ok && b64 != "" {
+        return &models.Plan{Steps: []*models.Step{
+            {
+                ID:          "step1",
+                Description: "Extract text from PDF",
+                Tool:        "pdf_extract",
+                Inputs:      map[string]any{"data_base64": b64},
+                Status:      models.StatusPending,
+            },
+            {
+                ID:          "step2",
+                Description: "Summarize PDF content",
+                Tool:        "summarize",
+                Inputs:      map[string]any{"text": "{{step:step1.output}}"},
+                Deps:        []string{"step1"},
+                Status:      models.StatusPending,
+            },
+        }}, nil
+    }
     // Prefer richer defaults: URL -> http_get -> html_to_text -> summarize, else llm_answer
     if strings.Contains(q, "http") || strings.HasPrefix(q, "http://") || strings.HasPrefix(q, "https://") {
         return &models.Plan{Steps: []*models.Step{

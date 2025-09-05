@@ -96,7 +96,10 @@ Rules:
 - If the query suggests calling a JSON API (mentions POST/JSON/payload) and includes a URL and a simple JSON object, use a single http_post_json step with that URL and JSON.
 - If there is no URL and it is a direct question, use a single llm_answer step with {"text": "<the query>"}.
 
-Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer"|"http_post_json", "inputs": { ... }, "deps": ["stepK"]}
+Special context:
+- If task context contains 'pdf_data_base64', plan: (1) pdf_extract(data_base64 from context) -> (2) summarize(text from step1).
+
+Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer"|"http_post_json"|"pdf_extract", "inputs": { ... }, "deps": ["stepK"]}
 
 User query: %s
 Context: %v`, task.Query, task.Context)

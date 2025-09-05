@@ -25,11 +25,27 @@ export default function App() {
   const [llmInfo, setLlmInfo] = useState<any | null>(null)
   const [streaming, setStreaming] = useState<Record<string,string>>({})
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   function copyText(text: string, key: string) {
     try { navigator.clipboard?.writeText(text) } catch {}
     setCopiedKey(key)
     setTimeout(() => setCopiedKey(prev => prev===key ? null : prev), 1500)
+  }
+
+  async function onFileChosen(file: File) {
+    if (!file) return
+    setUploading(true)
+    try {
+      const arr = await file.arrayBuffer()
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(arr)))
+      const ctx = { pdf_data_base64: `data:${file.type};base64,${b64}`, filename: file.name }
+      const res = await fetch(API('/tasks'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ query: `Uploaded file: ${file.name}`, context: ctx }) })
+      const t: Task = await res.json()
+      setTasks(prev => [t, ...prev])
+      setSelected(t)
+      await fetch(API(`/tasks/start/${t.id}`), { method:'POST' })
+    } finally { setUploading(false) }
   }
 
   async function refresh() {
@@ -160,6 +176,10 @@ export default function App() {
         <div className="toolbar" style={{marginBottom:8}}>
           <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Enter query or URL" />
           <button className="btn primary lg" onClick={createTask} disabled={!query || busy}>Create</button>
+          <label className="btn secondary md" style={{display:'inline-flex', alignItems:'center', gap:8}}>
+            <input type="file" accept="application/pdf" style={{display:'none'}} onChange={e=>onFileChosen(e.target.files?.[0] as File)} />
+            {uploading ? 'Uploading…' : 'Upload PDF'}
+          </label>
         </div>
         <div className="toolbar small" style={{justifyContent:'space-between'}}>
           <div className="muted">API: {API_BASE}</div>

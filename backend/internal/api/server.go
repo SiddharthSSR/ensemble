@@ -29,6 +29,7 @@ func init() {
     reg.Register(&tools.LLMAnswerTool{Client: llm.NewFromEnv()})
     reg.Register(&tools.HTMLToTextTool{})
     reg.Register(&tools.HTTPPostJSONTool{})
+    reg.Register(&tools.PDFExtractTool{})
     // Planner selection
     var planner agents.Planner = &agents.MockPlanner{}
     if os.Getenv("USE_LLM_PLANNER") == "1" {

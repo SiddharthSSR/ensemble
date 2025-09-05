@@ -119,6 +119,11 @@ Roadmap of next improvements.
   - regex_extract, html_extract (goquery), json_query (gjson), http_head/get_with_headers.
   - webhook_post; optional search_web (SerpAPI/Brave/Bing) with sources flow.
   - Shell/file sandbox tools with allowlist and size limits.
+  - Headless/web intelligence: headless_fetch (JS-rendered HTML + screenshot), crawl_site (bounded crawler with robots.txt), search_web (answers with sources).
+  - Structured extraction: extract_structured (LLM + JSON Schema), html_table_extract (tables → rows), pdf_extract (PDF text/layout/OCR).
+  - Knowledge/RAG: embed_and_search (local retrieval on provided corpus).
+  - APIs & schemas: api_call_openapi (operationId/path+method against OpenAPI spec).
+  - Data/compute: sql_query (SQLite, read-only), wasm_run (WASM sandboxed code).
 - Security & Config
   - Domain allowlist for HTTP tools; max response size and content-type filters.
   - Backend auth token for write endpoints; simple rate limiting.

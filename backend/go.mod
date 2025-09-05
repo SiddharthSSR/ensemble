@@ -1,12 +1,14 @@
 module github.com/example/agent-orchestrator
 
-go 1.23.0
+go 1.24.1
 
 toolchain go1.24.7
 
 require (
 	github.com/google/generative-ai-go v0.20.1
 	github.com/joho/godotenv v1.5.1
+	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
+	golang.org/x/net v0.43.0
 	google.golang.org/api v0.248.0
 )
 
@@ -31,7 +33,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
