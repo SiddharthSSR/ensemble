@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type Task = {
   id: string
@@ -10,12 +10,16 @@ type Task = {
 type Step = { id: string; description: string; tool: string; status: string }
 type Result = { step_id: string; output?: any; logs?: string; verified: boolean; error?: string }
 
-const API = (path: string) => `http://localhost:8080${path}`
+const API_BASE = 'http://localhost:8080'
+const API = (path: string) => `${API_BASE}${path}`
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Task | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [llmInfo, setLlmInfo] = useState<any | null>(null)
 
   async function refresh() {
     const res = await fetch(API('/tasks'))
@@ -27,78 +31,149 @@ export default function App() {
     }
   }
 
-  useEffect(() => { refresh(); const t = setInterval(refresh, 1500); return () => clearInterval(t) }, [])
+  useEffect(() => { refresh(); fetchLLM(); }, [])
+  useEffect(() => {
+    if (!autoRefresh) return
+    const t = setInterval(refresh, 1500)
+    return () => clearInterval(t)
+  }, [autoRefresh, selected])
 
   async function createTask() {
-    const res = await fetch(API('/tasks'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    })
-    const data: Task = await res.json()
-    setQuery('')
-    setTasks(prev => [data, ...prev])
+    setBusy(true)
+    try {
+      const res = await fetch(API('/tasks'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      })
+      const data: Task = await res.json()
+      setQuery('')
+      setTasks(prev => [data, ...prev])
+      setSelected(data)
+    } finally { setBusy(false) }
   }
 
   async function startTask(id: string) {
-    await fetch(API(`/tasks/start/${id}`), { method: 'POST' })
-    await refresh()
+    setBusy(true)
+    try { await fetch(API(`/tasks/start/${id}`), { method: 'POST' }); await refresh() } finally { setBusy(false) }
   }
 
-  return (
-    <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:16,padding:16,fontFamily:'Inter, system-ui, sans-serif'}}>
-      <div>
-        <h2>New Task</h2>
-        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Enter query or URL" style={{width:'100%',padding:8}} />
-        <button onClick={createTask} style={{marginTop:8}}>Create</button>
+  async function planTask(id: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(API(`/tasks/plan/${id}`), { method: 'POST' })
+      if (res.ok) await refresh()
+    } finally { setBusy(false) }
+  }
 
-        <h2 style={{marginTop:24}}>Tasks</h2>
-        <ul style={{listStyle:'none',padding:0}}>
+  async function executeTask(id: string) {
+    setBusy(true)
+    try { await fetch(API(`/tasks/execute/${id}`), { method: 'POST' }); await refresh() } finally { setBusy(false) }
+  }
+
+  async function fetchLLM() {
+    try {
+      const res = await fetch(API('/debug/llm'))
+      if (res.ok) setLlmInfo(await res.json())
+    } catch {}
+  }
+
+  const selectedId = selected?.id
+  const statusBadge = (s?: string) => <span className={`badge ${s}`}>{s}</span>
+
+  return (
+    <div className="app">
+      <div className="card">
+        <h2>New Task</h2>
+        <div className="toolbar" style={{marginBottom:8}}>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Enter query or URL" />
+          <button className="primary" onClick={createTask} disabled={!query || busy}>Create</button>
+        </div>
+        <div className="toolbar small" style={{justifyContent:'space-between'}}>
+          <div className="muted">API: {API_BASE}</div>
+          <label><input type="checkbox" checked={autoRefresh} onChange={e=>setAutoRefresh(e.target.checked)} /> Auto refresh</label>
+        </div>
+        <div className="card" style={{marginTop:12}}>
+          <div className="row" style={{marginBottom:8}}>
+            <h2 style={{margin:0}}>LLM</h2>
+            <button onClick={fetchLLM}>Refresh</button>
+          </div>
+          {!llmInfo ? <div className="muted small">Loading…</div> : (
+            <div className="small">
+              <div>Provider: <strong>{llmInfo.provider}</strong></div>
+              <div>Model: <span className="muted">{llmInfo.model||'n/a'}</span></div>
+              <div>Status: <span className={`badge ${llmInfo.ok? 'SUCCESS':'FAILED'}`}>{llmInfo.ok? 'OK':'ERROR'}</span> {llmInfo.error? <span className="muted">— {llmInfo.error}</span>:null}</div>
+            </div>
+          )}
+        </div>
+
+        <h2 style={{marginTop:16}}>Tasks</h2>
+        <ul className="list">
           {tasks.map(t => (
-            <li key={t.id} style={{marginBottom:8, padding:8, border:'1px solid #ddd', borderRadius:6}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <li key={t.id} className="item">
+              <div className="row">
                 <div>
-                  <strong>{t.id}</strong>
-                  <div style={{fontSize:12,color:'#555'}}>{t.query}</div>
+                  <div><strong>{t.query || '(no query)'}</strong></div>
+                  <div className="muted">{t.id}</div>
                 </div>
-                <div>
-                  <span style={{marginRight:8}}>{t.status}</span>
-                  <button onClick={() => startTask(t.id)} disabled={t.status==='RUNNING'}>Start</button>
-                  <button onClick={() => setSelected(t)} style={{marginLeft:8}}>Open</button>
+                <div className="toolbar">
+                  {statusBadge(t.status)}
+                  <button onClick={() => planTask(t.id)} disabled={busy}>Plan</button>
+                  <button onClick={() => executeTask(t.id)} disabled={busy || t.status==='RUNNING'}>Execute</button>
+                  <button onClick={() => startTask(t.id)} disabled={busy || t.status==='RUNNING'}>Start</button>
+                  <button onClick={() => setSelected(t)}>Open</button>
                 </div>
               </div>
             </li>
           ))}
         </ul>
       </div>
-      <div>
+
+      <div className="card">
         <h2>Task Detail</h2>
-        {!selected ? <div>Select a task…</div> : (
-          <div>
-            <div><strong>ID:</strong> {selected.id}</div>
-            <div><strong>Status:</strong> {selected.status}</div>
-            <h3>Plan</h3>
-            {!selected.plan ? <div>Not planned yet.</div> : (
-              <ul>
-                {selected.plan.steps.map(s => (
-                  <li key={s.id}>[{s.status}] {s.tool} — {s.description}</li>
-                ))}
-              </ul>
-            )}
-            <h3>Results</h3>
-            {!selected.results?.length ? <div>No results.</div> : (
-              <ul>
-                {selected.results.map((r,i) => (
-                  <li key={i}>
-                    step {r.step_id}: {r.verified ? 'verified' : 'not verified'} {r.error ? `— error: ${r.error}` : ''}
-                    <pre style={{background:'#fafafa',padding:8,whiteSpace:'pre-wrap'}}>{typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)}</pre>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {!selected ? <div className="muted">Select a task…</div> : (
+          <div className="grid2">
+            <div>
+              <div className="small muted">ID</div>
+              <div style={{marginBottom:8}}>{selected.id}</div>
+              <div className="small muted">Status</div>
+              <div style={{marginBottom:8}}>{statusBadge(selected.status)}</div>
+              <div className="small muted">Query</div>
+              <div style={{marginBottom:8, wordBreak:'break-word'}}>{selected.query}</div>
+              <div className="toolbar" style={{gap:8}}>
+                <button onClick={()=> planTask(selectedId!)} disabled={busy}>Plan</button>
+                <button onClick={()=> executeTask(selectedId!)} disabled={busy}>Execute</button>
+                <button onClick={()=> startTask(selectedId!)} disabled={busy}>Start</button>
+              </div>
+            </div>
+            <div>
+              <h2>Plan</h2>
+              {!selected.plan ? <div className="muted small">Not planned yet.</div> : (
+                <ul className="list">
+                  {selected.plan.steps.map((s:any) => (
+                    <li key={s.id} className="item">
+                      <div className="row"><strong>{s.tool}</strong> {statusBadge(s.status)}</div>
+                      <div className="muted small">{s.id} — {s.description}</div>
+                      {s.inputs ? <pre>{JSON.stringify(s.inputs,null,2)}</pre> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <h2>Results</h2>
+              {!selected.results?.length ? <div className="muted small">No results.</div> : (
+                <ul className="list">
+                  {selected.results.map((r:any,i:number) => (
+                    <li key={i} className="item">
+                      <div className="row"><strong>step {r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
+                      {r.logs ? <div className="muted small">{r.logs}</div> : null}
+                      <pre>{typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)}</pre>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </div>
     </div>
   )
 }
-
