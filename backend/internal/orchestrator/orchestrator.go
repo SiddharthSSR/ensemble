@@ -5,13 +5,13 @@ import (
     "encoding/json"
     "errors"
     "fmt"
-    "strings"
     "sync"
     "time"
 
     "github.com/example/agent-orchestrator/internal/agents"
     "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/tools"
+    "regexp"
 )
 
 type Orchestrator struct {
@@ -205,16 +205,19 @@ func resolveInputs(inputs map[string]any, resultsByID map[string]*models.Result)
     out := make(map[string]any, len(inputs))
     for k, v := range inputs {
         if s, ok := v.(string); ok {
-            // pattern: {{step:ID.output}}
-            if strings.HasPrefix(s, "{{step:") && strings.HasSuffix(s, ".output}}") {
-                id := strings.TrimSuffix(strings.TrimPrefix(s, "{{step:"), ".output}}")
+            // Replace all occurrences of {{step:ID.output}} within the string
+            re := regexp.MustCompile(`\{\{step:([a-zA-Z0-9_\-]+)\.output\}\}`)
+            replaced := re.ReplaceAllStringFunc(s, func(m string) string {
+                match := re.FindStringSubmatch(m)
+                if len(match) != 2 { return m }
+                id := match[1]
                 if res, ok := resultsByID[id]; ok && res != nil {
-                    out[k] = stringifyOutput(res.Output)
-                    continue
+                    return stringifyOutput(res.Output)
                 }
-                out[k] = fmt.Sprintf("(missing output from %s)", id)
-                continue
-            }
+                return fmt.Sprintf("(missing output from %s)", id)
+            })
+            out[k] = replaced
+            continue
         }
         out[k] = v
     }
