@@ -22,7 +22,7 @@ func (t *PDFExtractTool) Execute(ctx context.Context, inputs map[string]any) (an
     if dataB64 == "" {
         return nil, "", fmt.Errorf("missing data_base64")
     }
-    maxBytes := getInt(inputs, "max_bytes", envInt("PDF_MAX_BYTES", 10*1024*1024))
+    maxBytes := getInt(inputs, "max_bytes", envInt("PDF_MAX_BYTES", 20*1024*1024))
     maxPages := getInt(inputs, "max_pages", envInt("PDF_MAX_PAGES", 20))
     deadline := time.Now().Add(time.Duration(envInt("PDF_TIMEOUT_MS", 60000)) * time.Millisecond)
     // decode base64 (allow data: URIs)
@@ -64,7 +64,7 @@ func (t *PDFExtractTool) Execute(ctx context.Context, inputs map[string]any) (an
         }
     }
     text := strings.TrimSpace(out.String())
-    return map[string]any{"text": text, "pages": len(selected)}, fmt.Sprintf("pages=%d/%d bytes=%d", len(selected), totalPages, len(buf)), nil
+    return text, fmt.Sprintf("pages=%d/%d bytes=%d", len(selected), totalPages, len(buf)), nil
 }
 
 func envInt(key string, def int) int {

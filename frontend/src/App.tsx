@@ -38,14 +38,24 @@ export default function App() {
     if (!file) return
     setUploading(true)
     try {
-      const arr = await file.arrayBuffer()
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(arr)))
-      const ctx = { pdf_data_base64: `data:${file.type};base64,${b64}`, filename: file.name }
+      // Use FileReader to get a data URL to avoid manual base64 conversion limits
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader()
+        fr.onerror = () => reject(new Error('Failed to read file'))
+        fr.onload = () => resolve(String(fr.result))
+        fr.readAsDataURL(file)
+      })
+      const ctx = { pdf_data_base64: dataUrl, filename: file.name }
       const res = await fetch(API('/tasks'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ query: `Uploaded file: ${file.name}`, context: ctx }) })
+      if (!res.ok) throw new Error('Failed to create task')
       const t: Task = await res.json()
       setTasks(prev => [t, ...prev])
       setSelected(t)
-      await fetch(API(`/tasks/start/${t.id}`), { method:'POST' })
+      const st = await fetch(API(`/tasks/start/${t.id}`), { method:'POST' })
+      if (!st.ok) throw new Error('Failed to start task')
+    } catch (e) {
+      console.error(e)
+      alert('Upload or processing failed. Try a smaller PDF or fewer pages.')
     } finally { setUploading(false) }
   }
 
