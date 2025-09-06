@@ -27,7 +27,11 @@ func (h *HTTPGetTool) Execute(ctx context.Context, inputs map[string]any) (any, 
         return nil, "", err
     }
     defer resp.Body.Close()
-    b, _ := io.ReadAll(resp.Body)
-    return string(b), fmt.Sprintf("status=%d", resp.StatusCode), nil
+    // limit body to avoid huge transfers
+    max := envInt("HTTP_GET_MAX_BYTES", 2<<20)
+    lr := io.LimitedReader{R: resp.Body, N: int64(max)}
+    b, _ := io.ReadAll(&lr)
+    logs := fmt.Sprintf("status=%d", resp.StatusCode)
+    if lr.N == 0 { logs += " truncated=true" }
+    return string(b), logs, nil
 }
-

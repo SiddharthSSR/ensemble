@@ -47,6 +47,8 @@ func (t *PDFExtractTool) Execute(ctx context.Context, inputs map[string]any) (an
     if len(selected) > maxPages { selected = selected[:maxPages] }
 
     var out strings.Builder
+    maxOut := getInt(inputs, "max_text_bytes", envInt("PDF_MAX_TEXT_BYTES", 500_000))
+    written := 0
     // streaming callback support
     var cb TokenCallback
     if v := ctx.Value(CtxTokenCallbackKey); v != nil {
@@ -58,13 +60,21 @@ func (t *PDFExtractTool) Execute(ctx context.Context, inputs map[string]any) (an
         txt, _ := p.GetPlainText(nil)
         t := strings.TrimSpace(txt)
         if t != "" {
-            if cb != nil { cb(fmt.Sprintf("\n\n--- Page %d ---\n%s", page, t)) }
-            out.WriteString(t)
-            out.WriteString("\n\n")
+            chunk := fmt.Sprintf("\n\n--- Page %d ---\n%s", page, t)
+            if cb != nil { cb(chunk) }
+            // enforce max output size
+            remaining := maxOut - written
+            if remaining <= 0 { break }
+            if len(chunk) > remaining { chunk = chunk[:remaining] }
+            out.WriteString(chunk)
+            written += len(chunk)
         }
+        if written >= maxOut { break }
     }
     text := strings.TrimSpace(out.String())
-    return text, fmt.Sprintf("pages=%d/%d bytes=%d", len(selected), totalPages, len(buf)), nil
+    logs := fmt.Sprintf("pages=%d/%d bytes=%d", len(selected), totalPages, len(buf))
+    if written >= maxOut { logs += " truncated=true" }
+    return text, logs, nil
 }
 
 func envInt(key string, def int) int {

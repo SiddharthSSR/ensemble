@@ -19,7 +19,13 @@ func (t *HTMLToTextTool) Execute(ctx context.Context, inputs map[string]any) (an
     var b strings.Builder
     extractText(node, &b, false)
     out := strings.TrimSpace(compactWhitespace(b.String()))
-    return out, "", nil
+    // Cap output size to avoid UI/transport overload
+    max := getInt(inputs, "max_text_bytes", envInt("HTML_TO_TEXT_MAX_BYTES", 500_000))
+    truncated := false
+    if len(out) > max { out = out[:max]; truncated = true }
+    logs := ""
+    if truncated { logs = "truncated=true" }
+    return out, logs, nil
 }
 
 func extractText(n *html.Node, b *strings.Builder, inHidden bool) {
@@ -57,4 +63,3 @@ func compactWhitespace(s string) string {
     }
     return strings.Join(out, "\n")
 }
-
