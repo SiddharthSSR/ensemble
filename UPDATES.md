@@ -59,3 +59,19 @@ High-level change log for major refactors and features. Keep bullets concise.
 - Live updates (SSE):
   - Added in-memory event hub and `/tasks/{id}/events` endpoint for Server-Sent Events.
   - Streams: task status changes, plan snapshot, step status updates, and results.
+
+## 2025-09-06–07 (Unified tools, files, performance)
+
+- Unified planning & execution:
+  - Added `call_tool` delegator so the planner can emit a single tool that calls any registered tool. Enable via `USE_UNIFIED_TOOL=1`.
+  - Deep input substitution now replaces `{{step:ID.output}}` inside nested maps/arrays.
+- New tools:
+  - `file_extract` (generic attachments → text; PDF/HTML/text/CSV/JSON/YAML autodetect), `extract_links`, `csv_parse`, `regex_extract`, `json_pretty`, `summarize_chunked` (map-reduce).
+- Files/attachments:
+  - Frontend now accepts any file; sends `context.attachments=[{data_base64, filename, content_type}]` (keeps `pdf_data_base64` for back-compat).
+  - Planner: CSV → `file_extract` → `csv_parse` → summarize/answer; JSON → `file_extract` → `json_pretty` → summarize/answer.
+- Performance & stability:
+  - Output caps with env vars: `FILE_MAX_BYTES`, `PDF_MAX_TEXT_BYTES`, `HTML_TO_TEXT_MAX_BYTES`, `HTTP_GET_MAX_BYTES`.
+  - SSE token coalescing at 100ms on backend; UI also throttles streaming renders at 100ms.
+  - UI clamps large outputs/streams with Expand/Collapse to prevent blank screens and scroll thrash.
+  - Added `summarize_chunked` and planner preference for chunked summary on large texts.

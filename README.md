@@ -2,7 +2,7 @@
 
 ## Overview
 Planner → Executor(s) → Verifier pipeline with a Go backend and React frontend. LLM integration is provider-agnostic (OpenAI, Anthropic, Gemini via HTTP) with a mock fallback. Tools are pluggable (echo, http_get, summarize).
-New tools: html_to_text, http_post_json, llm_answer.
+Key additions: unified `call_tool`, generic `file_extract`, `csv_parse`, `regex_extract`, `json_pretty`, and `summarize_chunked` for large texts.
 
 ## Flowchart
 ```mermaid
@@ -84,6 +84,24 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
   - Example:
     - `{ "tool":"llm_answer", "inputs": {"text": "What is an AI agent?"} }`
 
+- call_tool (unified delegator)
+  - Purpose: Delegate to any registered tool via one interface.
+  - Enable: set `USE_UNIFIED_TOOL=1` to have the LLM planner emit `call_tool` steps.
+  - Inputs: `{ tool: string, inputs: object }` (e.g., `{tool:"http_get", inputs:{url:"https://..."}}`).
+
+- file_extract
+  - Purpose: Turn attachments into text (PDF/HTML/text/CSV/JSON/YAML autodetect; safe caps and truncation).
+  - Inputs: `data_base64: string`, `filename?: string`, `content_type?: string`.
+  - Planner paths: CSV → `file_extract` → `csv_parse`; JSON → `file_extract` → `json_pretty`.
+
+- csv_parse / regex_extract / json_pretty
+  - Purpose: Parse CSV into rows; extract via regex; pretty-print JSON.
+  - Typical flow: `file_extract` → `csv_parse` → `summarize` or `llm_answer`.
+
+- summarize_chunked
+  - Purpose: Map-reduce summarization for large text (splits → parallel per-chunk summaries → streamed reduce).
+  - Inputs: `text: string`, `chunk_chars?: number`, `overlap_chars?: number`, `max_parallel?: number`.
+
 ### LLM Providers
 - Enable LLM planner and/or verifier by setting:
   - `USE_LLM_PLANNER=1` and/or `USE_LLM_VERIFIER=1`
@@ -95,6 +113,25 @@ App runs on http://localhost:5173 and talks to backend at http://localhost:8080.
     - `ANTHROPIC_API_KEY`
     - `GOOGLE_API_KEY`
 - If no provider/key is set, a mock LLM is used.
+
+### Unified Tool Mode
+- Set `USE_LLM_PLANNER=1` and `USE_UNIFIED_TOOL=1` to have the planner emit `call_tool` steps only; executor delegates to concrete tools internally.
+  - Example plan: `call_tool(http_get)` → `call_tool(html_to_text)` → `call_tool(summarize_chunked)`.
+
+### File Attachments
+- The UI accepts any file and sends:
+  - `context.attachments = [{ data_base64, filename, content_type }]`
+  - For PDFs, `pdf_data_base64` is also included for back-compat.
+- Typical flows:
+  - CSV: `file_extract` → `csv_parse` → `summarize` or `llm_answer`.
+  - JSON: `file_extract` → `json_pretty` → `summarize` or `llm_answer`.
+
+### Performance & Stability
+- Output and fetch caps to keep UI responsive (override via env in backend):
+  - `FILE_MAX_BYTES` (uploads), `PDF_MAX_TEXT_BYTES`, `HTML_TO_TEXT_MAX_BYTES`, `HTTP_GET_MAX_BYTES`.
+  - `CHUNK_CHARS`, `CHUNK_OVERLAP`, `CHUNK_MAX_PAR` for `summarize_chunked`.
+- Streaming performance:
+  - Backend coalesces SSE tokens at ~100ms; UI throttles render to ~100ms and clamps big outputs with Expand/Collapse.
 
 ### .env support
 - The backend loads environment variables from `.env` in `backend/` if present.
