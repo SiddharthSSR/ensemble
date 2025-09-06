@@ -63,19 +63,44 @@ func (p *LLMPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan,
         if id == "" {
             id = fmt.Sprintf("step%d", i+1)
         }
-        out = append(out, &models.Step{
-            ID:          id,
-            Description: s.Description,
-            Tool:        s.Tool,
-            Inputs:      s.Inputs,
-            Deps:        s.Deps,
-            Status:      models.StatusPending,
-        })
+        tool := s.Tool
+        inputs := s.Inputs
+        // If unified tool mode is enabled, wrap any non-call_tool step into call_tool
+        if os.Getenv("USE_UNIFIED_TOOL") == "1" && tool != "call_tool" {
+            inputs = map[string]any{"tool": tool, "inputs": inputs}
+            tool = "call_tool"
+        }
+        out = append(out, &models.Step{ID: id, Description: s.Description, Tool: tool, Inputs: inputs, Deps: s.Deps, Status: models.StatusPending})
     }
     return &models.Plan{Steps: out}, nil
 }
 
 func buildPlanPrompt(task *models.Task) string {
+    if os.Getenv("USE_UNIFIED_TOOL") == "1" {
+        return fmt.Sprintf(`You are a planning agent for a constrained tool runner.
+Output ONLY a JSON array of step objects, no prose, no code fences.
+
+Single tool available:
+- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract", "inputs": object}
+
+Rules:
+- Produce 1–3 ordered steps (prefer 2 when helpful) and use "deps" for ordering.
+- To pass previous output to a later step, set a string inside inputs to: {{step:ID.output}}
+- If the query contains or implies a URL, plan: (1) call_tool(http_get) -> (2) call_tool(html_to_text) -> (3) call_tool(summarize).
+- If the query starts with "summarize:" or "summarise:", use a single call_tool(summarize) with the rest of the query.
+- For JSON API calls, use a single call_tool(http_post_json) with the URL and JSON.
+- For direct questions, use a single call_tool(llm_answer).
+
+PDF context (if context has 'pdf_data_base64'):
+- If query mentions summarize: call_tool(pdf_extract) -> call_tool(summarize) with step1 output.
+- Otherwise: call_tool(pdf_extract) -> call_tool(llm_answer) with instructions referencing {{step:step1.output}}.
+
+Schema for each step: {"id": "stepN", "description": "...", "tool": "call_tool", "inputs": {"tool": "...", "inputs": {...}}, "deps": ["stepK"]}
+
+User query: %s
+Context: %v`, task.Query, task.Context)
+    }
+    // Non-unified prompt (legacy)
     return fmt.Sprintf(`You are a planning agent for a constrained tool runner.
 Output ONLY a JSON array of step objects, no prose, no code fences.
 
@@ -85,7 +110,8 @@ Tools (you MUST stick to these):
 - html_to_text: inputs {"html": string}
 - summarize: inputs {"text": string}
 - llm_answer: inputs {"text": string}
- - http_post_json: inputs {"url": string, "json": any}
+- http_post_json: inputs {"url": string, "json": any}
+- pdf_extract: inputs {"data_base64": string}
 
 Rules:
 - Produce 1–3 ordered steps. Prefer 2 steps when helpful.
