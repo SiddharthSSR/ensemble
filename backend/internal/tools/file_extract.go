@@ -3,7 +3,6 @@ package tools
 import (
     "context"
     "encoding/base64"
-    "errors"
     "fmt"
     "path/filepath"
     "strings"
@@ -55,20 +54,19 @@ func (t *FileExtractTool) Execute(ctx context.Context, inputs map[string]any) (a
     // Plain-text-ish types: txt, md, markdown, csv, json, log, yaml, yml
     isCSV := ext == "csv" || strings.Contains(strings.ToLower(ctype), "csv") || strings.Contains(strings.ToLower(ctype), "ms-excel")
     if ext == "txt" || ext == "md" || ext == "markdown" || isCSV || ext == "json" || ext == "log" || ext == "yaml" || ext == "yml" ||
-        strings.Contains(ctype, "text/") || strings.Contains(ctype, "json") || strings.Contains(ctype, "yaml") {
-        // Return as string (no parsing); callers can choose summarize or regex/csv tools next
+        strings.Contains(strings.ToLower(ctype), "text/") || strings.Contains(strings.ToLower(ctype), "json") || strings.Contains(strings.ToLower(ctype), "yaml") || looksLikeText(buf) {
+        // Return as string (no parsing); callers can choose summarize or csv_parse/regex_extract next
         text := strings.TrimSpace(string(buf))
-        return text, fmt.Sprintf("plain ext=%s len=%d", ext, len(text)), nil
+        meta := []string{}
+        if ext != "" { meta = append(meta, "ext="+ext) }
+        if ctype != "" { meta = append(meta, "ctype="+ctype) }
+        meta = append(meta, fmt.Sprintf("len=%d", len(text)))
+        return text, strings.Join(meta, " "), nil
     }
 
-    // Heuristic: treat as text if buffer looks like UTF-8/plain text (no NULs, mostly printable)
-    if looksLikeText(buf) {
-        text := strings.TrimSpace(string(buf))
-        return text, fmt.Sprintf("plain heuristic len=%d", len(text)), nil
-    }
-
-    // Unknown/binary — return an error to signal unsupported type
-    return nil, "", errors.New("unsupported file type; provide PDF/HTML/text/CSV/JSON/YAML")
+    // Unknown/binary — still return raw text safely trimmed to avoid failing flows
+    text := strings.TrimSpace(string(buf))
+    return text, fmt.Sprintf("binary? len=%d", len(text)), nil
 }
 
 func prependLog(kind, logs string) string {
