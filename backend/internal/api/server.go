@@ -28,8 +28,13 @@ func init() {
     reg.Register(&tools.SummarizeTool{Client: llm.NewFromEnv()})
     reg.Register(&tools.LLMAnswerTool{Client: llm.NewFromEnv()})
     reg.Register(&tools.HTMLToTextTool{})
+    reg.Register(&tools.ExtractLinksTool{})
+    reg.Register(&tools.CSVParseTool{})
+    reg.Register(&tools.RegexExtractTool{})
     reg.Register(&tools.HTTPPostJSONTool{})
     reg.Register(&tools.PDFExtractTool{})
+    // Unified delegator tool
+    reg.Register(&tools.CallTool{Registry: reg})
     // Planner selection
     var planner agents.Planner = &agents.MockPlanner{}
     if os.Getenv("USE_LLM_PLANNER") == "1" {
