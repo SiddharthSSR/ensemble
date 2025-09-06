@@ -61,6 +61,12 @@ func (t *FileExtractTool) Execute(ctx context.Context, inputs map[string]any) (a
         return text, fmt.Sprintf("plain ext=%s len=%d", ext, len(text)), nil
     }
 
+    // Heuristic: treat as text if buffer looks like UTF-8/plain text (no NULs, mostly printable)
+    if looksLikeText(buf) {
+        text := strings.TrimSpace(string(buf))
+        return text, fmt.Sprintf("plain heuristic len=%d", len(text)), nil
+    }
+
     // Unknown/binary — return an error to signal unsupported type
     return nil, "", errors.New("unsupported file type; provide PDF/HTML/text/CSV/JSON/YAML")
 }
@@ -68,4 +74,22 @@ func (t *FileExtractTool) Execute(ctx context.Context, inputs map[string]any) (a
 func prependLog(kind, logs string) string {
     if logs == "" { return kind }
     return kind + " " + logs
+}
+
+// looksLikeText returns true if the buffer appears to be textual data.
+func looksLikeText(b []byte) bool {
+    if len(b) == 0 { return false }
+    n := len(b)
+    // sample up to first 4096 bytes
+    if n > 4096 { n = 4096 }
+    var printable, zeros int
+    for i := 0; i < n; i++ {
+        c := b[i]
+        if c == 0 { zeros++; continue }
+        // allow common whitespace and printable ASCII
+        if (c >= 32 && c <= 126) || c == '\n' || c == '\r' || c == '\t' { printable++ }
+    }
+    if zeros > 0 { return false }
+    // at least 80% printable suggests text
+    return printable*100/n >= 80
 }
