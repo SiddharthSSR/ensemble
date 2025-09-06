@@ -87,8 +87,8 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
         step.Status = models.StatusRunning
         t.UpdatedAt = time.Now()
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
-        // resolve input references from prior step outputs
-        step.Inputs = resolveInputs(step.Inputs, resultsByID)
+        // resolve input references from prior step outputs (deeply)
+        step.Inputs = resolveInputsDeep(step.Inputs, resultsByID)
         // attach token streaming callback for LLM tools
         subCtx := context.WithValue(ctx, tools.CtxTokenCallbackKey, tools.TokenCallback(func(chunk string) {
             o.hub.Publish(id, Event{Event: "token", TaskID: id, Payload: map[string]any{"step_id": step.ID, "chunk": chunk}})
@@ -158,7 +158,7 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
         step.Status = models.StatusRunning
         t.UpdatedAt = time.Now()
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
-        step.Inputs = resolveInputs(step.Inputs, resultsByID)
+        step.Inputs = resolveInputsDeep(step.Inputs, resultsByID)
         subCtx := context.WithValue(ctx, tools.CtxTokenCallbackKey, tools.TokenCallback(func(chunk string) {
             o.hub.Publish(id, Event{Event: "token", TaskID: id, Payload: map[string]any{"step_id": step.ID, "chunk": chunk}})
         }))
@@ -200,28 +200,41 @@ func (o *Orchestrator) Subscribe(taskID string) (<-chan []byte, func()) {
 
 // resolveInputs replaces any string value exactly matching {{step:ID.output}} with the
 // stringified output of that prior step, if available.
-func resolveInputs(inputs map[string]any, resultsByID map[string]*models.Result) map[string]any {
+func resolveInputsDeep(inputs map[string]any, resultsByID map[string]*models.Result) map[string]any {
     if inputs == nil { return nil }
     out := make(map[string]any, len(inputs))
-    for k, v := range inputs {
-        if s, ok := v.(string); ok {
-            // Replace all occurrences of {{step:ID.output}} within the string
-            re := regexp.MustCompile(`\{\{step:([a-zA-Z0-9_\-]+)\.output\}\}`)
-            replaced := re.ReplaceAllStringFunc(s, func(m string) string {
-                match := re.FindStringSubmatch(m)
-                if len(match) != 2 { return m }
-                id := match[1]
-                if res, ok := resultsByID[id]; ok && res != nil {
-                    return stringifyOutput(res.Output)
-                }
-                return fmt.Sprintf("(missing output from %s)", id)
-            })
-            out[k] = replaced
-            continue
-        }
-        out[k] = v
-    }
+    for k, v := range inputs { out[k] = resolveValueDeep(v, resultsByID) }
     return out
+}
+
+func resolveValueDeep(v any, resultsByID map[string]*models.Result) any {
+    switch t := v.(type) {
+    case string:
+        return replacePlaceholders(t, resultsByID)
+    case map[string]any:
+        m := make(map[string]any, len(t))
+        for k2, v2 := range t { m[k2] = resolveValueDeep(v2, resultsByID) }
+        return m
+    case []any:
+        a := make([]any, len(t))
+        for i := range t { a[i] = resolveValueDeep(t[i], resultsByID) }
+        return a
+    default:
+        return v
+    }
+}
+
+func replacePlaceholders(s string, resultsByID map[string]*models.Result) string {
+    re := regexp.MustCompile(`\{\{step:([a-zA-Z0-9_\-]+)\.output\}\}`)
+    return re.ReplaceAllStringFunc(s, func(m string) string {
+        match := re.FindStringSubmatch(m)
+        if len(match) != 2 { return m }
+        id := match[1]
+        if res, ok := resultsByID[id]; ok && res != nil {
+            return stringifyOutput(res.Output)
+        }
+        return fmt.Sprintf("(missing output from %s)", id)
+    })
 }
 
 func stringifyOutput(v any) string {
