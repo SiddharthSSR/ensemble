@@ -335,7 +335,9 @@ export default function App() {
                         {(s.status==='RUNNING' || streaming[s.id]) ? <span className="spinner" aria-label="loading" /> : null}
                       </div>
                       <div className="muted small">{s.id} — {s.description}</div>
-                      {s.inputs ? <pre>{JSON.stringify(s.inputs,null,2)}</pre> : null}
+                      {s.inputs ? (
+                        <ClampedPre text={JSON.stringify(s.inputs,null,2)} keyId={`inputs-${s.id}`} label="inputs" />
+                      ) : null}
                       {streaming[s.id] ? (
                         <ClampedPre text={streaming[s.id]} keyId={`live-${s.id}`} label="stream" />
                       ) : null}

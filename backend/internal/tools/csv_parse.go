@@ -3,7 +3,9 @@ package tools
 import (
     "context"
     "encoding/csv"
+    "errors"
     "fmt"
+    "io"
     "strings"
 )
 
@@ -48,16 +50,16 @@ func (t *CSVParseTool) Execute(ctx context.Context, inputs map[string]any) (any,
         for i := range headers { headers[i] = strings.TrimSpace(headers[i]) }
     }
 
-    // read all rows
-    var out []map[string]string
+    // read all rows (ensure non-nil slice so JSON is [] not null)
+    out := make([]map[string]string, 0, 64)
     idx := 0
     for {
         rec, err := rdr.Read()
         if err != nil {
-            if err.Error() == "EOF" { break }
-            if err.Error() == "EOF\n" { break }
+            if errors.Is(err, io.EOF) { break }
+            // Some CSVs may end with a partial line; treat as EOF
             if strings.Contains(err.Error(), "EOF") { break }
-            return nil, "", err
+            return out, "", err
         }
         // derive headers if not provided
         if len(headers) == 0 {
@@ -75,4 +77,3 @@ func (t *CSVParseTool) Execute(ctx context.Context, inputs map[string]any) (any,
     }
     return out, fmt.Sprintf("rows=%d cols=%d", len(out), len(headers)), nil
 }
-
