@@ -81,7 +81,7 @@ func buildPlanPrompt(task *models.Task) string {
 Output ONLY a JSON array of step objects, no prose, no code fences.
 
 Single tool available:
-- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract|file_extract", "inputs": object}
+- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract|file_extract|csv_parse", "inputs": object}
 
 Rules:
 - Produce 1–3 ordered steps (prefer 2 when helpful) and use "deps" for ordering.
@@ -93,7 +93,7 @@ Rules:
 
  PDF/files in context:
  - If context has 'pdf_data_base64', prefer: call_tool(pdf_extract) then summarize or llm_answer with its output.
- - If context has 'attachments' (array of files with data_base64/filename/content_type), start with call_tool(file_extract) on the first attachment, then summarize or llm_answer using its text.
+ - If context has 'attachments' (array of files with data_base64/filename/content_type), start with call_tool(file_extract) on the first attachment. If the filename ends with .csv or the content-type suggests CSV/MS-Excel, insert call_tool(csv_parse) with {"csv": "{{step:step1.output}}"} before summarize/llm_answer.
 
 Schema for each step: {"id": "stepN", "description": "...", "tool": "call_tool", "inputs": {"tool": "...", "inputs": {...}}, "deps": ["stepK"]}
 
@@ -112,7 +112,8 @@ Tools (you MUST stick to these):
 - llm_answer: inputs {"text": string}
 - http_post_json: inputs {"url": string, "json": any}
 - pdf_extract: inputs {"data_base64": string}
- - file_extract: inputs {"data_base64": string, "filename?": string, "content_type?": string}
+- file_extract: inputs {"data_base64": string, "filename?": string, "content_type?": string}
+- csv_parse: inputs {"csv": string, "delimiter?": string}
 
 Rules:
 - Produce 1–3 ordered steps. Prefer 2 steps when helpful.
@@ -127,7 +128,9 @@ Rules:
  - If task context contains 'pdf_data_base64':
    - If the query mentions "summarize"/"summarise": (1) pdf_extract(data_base64 from context) -> (2) summarize(text from step1).
    - Otherwise: (1) pdf_extract(data_base64 from context) -> (2) llm_answer(text="<the query>", instructions="Use the following PDF content as context.\n\nContext:\n{{step:step1.output}}" ).
- - If task context contains 'attachments' (array), consider starting with file_extract on the first attachment, then summarize or answer using its text.
+ - If task context contains 'attachments' (array):
+   - Start with file_extract on the first attachment.
+   - If the filename ends with .csv or the content-type suggests CSV/MS-Excel, insert a csv_parse step with {"csv": "{{step:step1.output}}"}, then summarize/answer using the parsed output.
 
 Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer"|"http_post_json"|"pdf_extract", "inputs": { ... }, "deps": ["stepK"]}
 
