@@ -31,6 +31,27 @@ export default function App() {
   const [attachmentName, setAttachmentName] = useState<string | null>(null)
   const [attachmentType, setAttachmentType] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  const CLAMP_LIMIT = 80_000 // ~80KB keeps UI responsive
+
+  function ClampedPre({ text, keyId, label }: { text: string; keyId: string; label: string }) {
+    const isExpanded = !!expanded[keyId]
+    const over = (text?.length || 0) > CLAMP_LIMIT
+    const shown = isExpanded || !over ? text : text.slice(0, CLAMP_LIMIT)
+    return (
+      <div>
+        <div className="prebar">
+          <div className="muted small">{label}{over && !isExpanded ? ` (showing ${CLAMP_LIMIT} chars)` : ''}</div>
+          <button className="btn ghost sm" onClick={()=>copyText(shown, keyId)}>{copiedKey===keyId ? 'Copied!' : 'Copy'}</button>
+          {over ? (
+            <button className="btn ghost sm" onClick={()=>setExpanded(prev=>({ ...prev, [keyId]: !isExpanded }))}>{isExpanded ? 'Collapse' : 'Expand'}</button>
+          ) : null}
+        </div>
+        <pre>{shown}</pre>
+      </div>
+    )
+  }
 
   function copyText(text: string, key: string) {
     try { navigator.clipboard?.writeText(text) } catch {}
@@ -288,15 +309,8 @@ export default function App() {
                       <div className="muted small">{s.id} — {s.description}</div>
                       {s.inputs ? <pre>{JSON.stringify(s.inputs,null,2)}</pre> : null}
                       {streaming[s.id] ? (
-                        <div>
-                          <div className="muted small">Live output…</div>
-                          <div className="prebar">
-                            <div className="muted small">stream</div>
-                            <button className="btn ghost sm" onClick={()=>copyText(streaming[s.id], `live-${s.id}`)}>{copiedKey===`live-${s.id}` ? 'Copied!' : 'Copy'}</button>
-                          </div>
-                          <pre>{streaming[s.id]}</pre>
-                        </div>
-                      ): null}
+                        <ClampedPre text={streaming[s.id]} keyId={`live-${s.id}`} label="stream" />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -308,11 +322,7 @@ export default function App() {
                     <li key={i} className="item">
                       <div className="row"><strong>{r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
                       {r.logs ? <div className="muted small">{r.logs}</div> : null}
-                      <div className="prebar">
-                        <div className="muted small">output</div>
-                        <button className="btn ghost sm" onClick={()=>copyText(typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2), `out-${i}`)}>{copiedKey===`out-${i}` ? 'Copied!' : 'Copy'}</button>
-                      </div>
-                      <pre>{typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)}</pre>
+                      <ClampedPre text={typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)} keyId={`out-${i}`} label="output" />
                     </li>
                   ))}
                 </ul>
