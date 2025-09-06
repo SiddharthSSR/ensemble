@@ -53,8 +53,9 @@ func (t *FileExtractTool) Execute(ctx context.Context, inputs map[string]any) (a
     }
 
     // Plain-text-ish types: txt, md, markdown, csv, json, log, yaml, yml
-    if ext == "txt" || ext == "md" || ext == "markdown" || ext == "csv" || ext == "json" || ext == "log" || ext == "yaml" || ext == "yml" ||
-        strings.Contains(ctype, "text/") || strings.Contains(ctype, "json") || strings.Contains(ctype, "csv") || strings.Contains(ctype, "yaml") {
+    isCSV := ext == "csv" || strings.Contains(strings.ToLower(ctype), "csv") || strings.Contains(strings.ToLower(ctype), "ms-excel")
+    if ext == "txt" || ext == "md" || ext == "markdown" || isCSV || ext == "json" || ext == "log" || ext == "yaml" || ext == "yml" ||
+        strings.Contains(ctype, "text/") || strings.Contains(ctype, "json") || strings.Contains(ctype, "yaml") {
         // Return as string (no parsing); callers can choose summarize or regex/csv tools next
         text := strings.TrimSpace(string(buf))
         return text, fmt.Sprintf("plain ext=%s len=%d", ext, len(text)), nil
