@@ -81,7 +81,7 @@ func buildPlanPrompt(task *models.Task) string {
 Output ONLY a JSON array of step objects, no prose, no code fences.
 
 Single tool available:
-- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract", "inputs": object}
+- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract|file_extract", "inputs": object}
 
 Rules:
 - Produce 1–3 ordered steps (prefer 2 when helpful) and use "deps" for ordering.
@@ -91,9 +91,9 @@ Rules:
 - For JSON API calls, use a single call_tool(http_post_json) with the URL and JSON.
 - For direct questions, use a single call_tool(llm_answer).
 
-PDF context (if context has 'pdf_data_base64'):
-- If query mentions summarize: call_tool(pdf_extract) -> call_tool(summarize) with step1 output.
-- Otherwise: call_tool(pdf_extract) -> call_tool(llm_answer) with instructions referencing {{step:step1.output}}.
+ PDF/files in context:
+ - If context has 'pdf_data_base64', prefer: call_tool(pdf_extract) then summarize or llm_answer with its output.
+ - If context has 'attachments' (array of files with data_base64/filename/content_type), start with call_tool(file_extract) on the first attachment, then summarize or llm_answer using its text.
 
 Schema for each step: {"id": "stepN", "description": "...", "tool": "call_tool", "inputs": {"tool": "...", "inputs": {...}}, "deps": ["stepK"]}
 
@@ -112,6 +112,7 @@ Tools (you MUST stick to these):
 - llm_answer: inputs {"text": string}
 - http_post_json: inputs {"url": string, "json": any}
 - pdf_extract: inputs {"data_base64": string}
+ - file_extract: inputs {"data_base64": string, "filename?": string, "content_type?": string}
 
 Rules:
 - Produce 1–3 ordered steps. Prefer 2 steps when helpful.
@@ -122,10 +123,11 @@ Rules:
 - If the query suggests calling a JSON API (mentions POST/JSON/payload) and includes a URL and a simple JSON object, use a single http_post_json step with that URL and JSON.
 - If there is no URL and it is a direct question, use a single llm_answer step with {"text": "<the query>"}.
 
-Special context:
-- If task context contains 'pdf_data_base64':
-  - If the query mentions "summarize"/"summarise": (1) pdf_extract(data_base64 from context) -> (2) summarize(text from step1).
-  - Otherwise: (1) pdf_extract(data_base64 from context) -> (2) llm_answer(text="<the query>", instructions="Use the following PDF content as context.\n\nContext:\n{{step:step1.output}}" ).
+ Special context:
+ - If task context contains 'pdf_data_base64':
+   - If the query mentions "summarize"/"summarise": (1) pdf_extract(data_base64 from context) -> (2) summarize(text from step1).
+   - Otherwise: (1) pdf_extract(data_base64 from context) -> (2) llm_answer(text="<the query>", instructions="Use the following PDF content as context.\n\nContext:\n{{step:step1.output}}" ).
+ - If task context contains 'attachments' (array), consider starting with file_extract on the first attachment, then summarize or answer using its text.
 
 Schema for each step: {"id": "stepN", "description": "...", "tool": "echo"|"http_get"|"html_to_text"|"summarize"|"llm_answer"|"http_post_json"|"pdf_extract", "inputs": { ... }, "deps": ["stepK"]}
 

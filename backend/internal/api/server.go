@@ -33,6 +33,7 @@ func init() {
     reg.Register(&tools.RegexExtractTool{})
     reg.Register(&tools.HTTPPostJSONTool{})
     reg.Register(&tools.PDFExtractTool{})
+    reg.Register(&tools.FileExtractTool{})
     // Unified delegator tool
     reg.Register(&tools.CallTool{Registry: reg})
     // Planner selection

@@ -27,8 +27,9 @@ export default function App() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
-  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null)
-  const [pdfName, setPdfName] = useState<string | null>(null)
+  const [attachmentDataUrl, setAttachmentDataUrl] = useState<string | null>(null)
+  const [attachmentName, setAttachmentName] = useState<string | null>(null)
+  const [attachmentType, setAttachmentType] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   function copyText(text: string, key: string) {
@@ -49,8 +50,9 @@ export default function App() {
         fr.readAsDataURL(file)
       })
       // Do NOT auto-create or start; just attach to next task creation
-      setPdfDataUrl(dataUrl)
-      setPdfName(file.name)
+      setAttachmentDataUrl(dataUrl)
+      setAttachmentName(file.name)
+      setAttachmentType(file.type || null)
     } catch (e) {
       console.error(e)
       alert('Upload failed. Try a smaller PDF or fewer pages.')
@@ -66,7 +68,7 @@ export default function App() {
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault(); e.stopPropagation(); setDrag(false)
     const f = e.dataTransfer?.files?.[0]
-    if (f && f.type === 'application/pdf') { onFileChosen(f) }
+    if (f) { onFileChosen(f) }
   }
 
   async function refresh() {
@@ -142,8 +144,12 @@ export default function App() {
     setBusy(true)
     try {
       const body: any = { query }
-      if (pdfDataUrl) {
-        body.context = { pdf_data_base64: pdfDataUrl, filename: pdfName }
+      if (attachmentDataUrl) {
+        const ctx: any = {}
+        const isPdf = (attachmentType||'').includes('pdf') || (attachmentName||'').toLowerCase().endsWith('.pdf')
+        if (isPdf) { ctx.pdf_data_base64 = attachmentDataUrl }
+        ctx.attachments = [{ data_base64: attachmentDataUrl, filename: attachmentName, content_type: attachmentType }]
+        body.context = ctx
       }
       const res = await fetch(API('/tasks'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -202,15 +208,15 @@ export default function App() {
           <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Enter query or URL" />
           <button className="btn primary lg" onClick={createTask} disabled={!query || busy}>Create</button>
           <label className="btn secondary md" style={{display:'inline-flex', alignItems:'center', gap:8}}>
-            <input ref={fileRef} type="file" accept="application/pdf" style={{display:'none'}} onChange={e=>{ const f = e.target.files?.[0] as File; if (f) { onFileChosen(f).finally(()=>{ if (fileRef.current) fileRef.current.value=''; }) } }} />
-            {uploading ? 'Uploading…' : 'Upload PDF'}
+            <input ref={fileRef} type="file" accept="*/*" style={{display:'none'}} onChange={e=>{ const f = e.target.files?.[0] as File; if (f) { onFileChosen(f).finally(()=>{ if (fileRef.current) fileRef.current.value=''; }) } }} />
+            {uploading ? 'Uploading…' : 'Upload File'}
           </label>
         </div>
         <div className={`dropzone ${drag? 'drag':''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-          {pdfName ? (
-            <span>Attached PDF: <strong>{pdfName}</strong> — will be included when you click Create. <button className="btn ghost sm" onClick={()=>{ setPdfDataUrl(null); setPdfName(null) }}>Clear</button></span>
+          {attachmentName ? (
+            <span>Attached file: <strong>{attachmentName}</strong> — will be included when you click Create. <button className="btn ghost sm" onClick={()=>{ setAttachmentDataUrl(null); setAttachmentName(null); setAttachmentType(null) }}>Clear</button></span>
           ) : (
-            <span>Drop a PDF here to attach it (won’t auto-run)</span>
+            <span>Drop a file here to attach it (won’t auto-run)</span>
           )}
         </div>
         <div className="toolbar small" style={{justifyContent:'space-between'}}>

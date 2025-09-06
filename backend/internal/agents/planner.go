@@ -3,6 +3,7 @@ package agents
 import (
     "context"
     "strings"
+    "os"
 
     "github.com/example/agent-orchestrator/internal/models"
 )
@@ -58,6 +59,23 @@ func (m *MockPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan
             },
         }}, nil
     }
+    // Generic attachments: use first attachment if present
+    if atts, ok := task.Context["attachments"].([]any); ok && len(atts) > 0 {
+        first, _ := atts[0].(map[string]any)
+        if data, ok := first["data_base64"].(string); ok && data != "" {
+            // If summarize requested, summarize the extracted text; else answer using it as context
+            if strings.Contains(q, "summarize") || strings.Contains(q, "summarise") {
+                return &models.Plan{Steps: []*models.Step{
+                    { ID: "step1", Description: "Extract text from file", Tool: pickUnified("file_extract"), Inputs: wrapIfUnified("file_extract", map[string]any{"data_base64": data, "filename": first["filename"], "content_type": first["content_type"]}), Status: models.StatusPending },
+                    { ID: "step2", Description: "Summarize file content", Tool: pickUnified("summarize"), Inputs: wrapIfUnified("summarize", map[string]any{"text": "{{step:step1.output}}"}), Deps: []string{"step1"}, Status: models.StatusPending },
+                }}, nil
+            }
+            return &models.Plan{Steps: []*models.Step{
+                { ID: "step1", Description: "Extract text from file", Tool: pickUnified("file_extract"), Inputs: wrapIfUnified("file_extract", map[string]any{"data_base64": data, "filename": first["filename"], "content_type": first["content_type"]}), Status: models.StatusPending },
+                { ID: "step2", Description: "Answer question using file context", Tool: pickUnified("llm_answer"), Inputs: wrapIfUnified("llm_answer", map[string]any{ "text": task.Query, "instructions": "Use the following file content as context to answer.\n\nContext:\n{{step:step1.output}}" }), Deps: []string{"step1"}, Status: models.StatusPending },
+            }}, nil
+        }
+    }
     // Prefer richer defaults: URL -> http_get -> html_to_text -> summarize, else llm_answer
     if strings.Contains(q, "http") || strings.HasPrefix(q, "http://") || strings.HasPrefix(q, "https://") {
         return &models.Plan{Steps: []*models.Step{
@@ -93,4 +111,16 @@ func (m *MockPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan
         Inputs:      map[string]any{"text": task.Query},
         Status:      models.StatusPending,
     }}}, nil
+}
+
+// Helpers to support unified call_tool in MockPlanner when env USE_UNIFIED_TOOL=1
+func pickUnified(tool string) string {
+    if strings.TrimSpace(os.Getenv("USE_UNIFIED_TOOL")) == "1" { return "call_tool" }
+    return tool
+}
+func wrapIfUnified(tool string, m map[string]any) map[string]any {
+    if strings.TrimSpace(os.Getenv("USE_UNIFIED_TOOL")) == "1" {
+        return map[string]any{"tool": tool, "inputs": m}
+    }
+    return m
 }
