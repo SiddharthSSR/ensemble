@@ -10,11 +10,13 @@ import (
 
     "github.com/example/agent-orchestrator/internal/agents"
     "github.com/example/agent-orchestrator/internal/orchestrator"
+    "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/tools"
     "github.com/example/agent-orchestrator/internal/providers/llm"
     "os"
     "fmt"
     "strings"
+    "strconv"
 )
 
 var orch *orchestrator.Orchestrator
@@ -89,7 +91,12 @@ func RegisterRoutes(mux *http.ServeMux) {
         switch r.Method {
         case http.MethodGet:
             tasks := orch.ListTasks()
-            respondJSON(w, tasks)
+            type lite struct{ ID string `json:"id"`; Query string `json:"query"`; Status string `json:"status"`; CreatedAt time.Time `json:"created_at"`; UpdatedAt time.Time `json:"updated_at"` }
+            out := make([]lite, 0, len(tasks))
+            for _, t := range tasks {
+                out = append(out, lite{ID: t.ID, Query: t.Query, Status: string(t.Status), CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt})
+            }
+            respondJSON(w, out)
         case http.MethodPost:
             var req struct{
                 Query string `json:"query"`
@@ -154,7 +161,7 @@ func RegisterRoutes(mux *http.ServeMux) {
             ch, unsub := orch.Subscribe(id)
             defer unsub()
             if t, ok := orch.GetTask(id); ok {
-                b, _ := json.Marshal(t)
+                b, _ := json.Marshal(previewTask(t))
                 writeSSE(w, "snapshot", b)
                 flusher.Flush()
             }
@@ -179,7 +186,39 @@ func RegisterRoutes(mux *http.ServeMux) {
         id := r.URL.Path[len("/tasks/"):]
         t, ok := orch.GetTask(id)
         if !ok { http.NotFound(w, r); return }
-        respondJSON(w, t)
+        respondJSON(w, previewTask(t))
+    })
+
+    // Full output endpoint: /tasks/result/{id}/{step_id}?download=1
+    mux.HandleFunc("/tasks/result/", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet { w.WriteHeader(http.StatusMethodNotAllowed); return }
+        rest := r.URL.Path[len("/tasks/result/"):]
+        parts := strings.SplitN(rest, "/", 2)
+        if len(parts) != 2 { http.Error(w, "bad path", http.StatusBadRequest); return }
+        id, stepID := parts[0], parts[1]
+        t, ok := orch.GetTask(id)
+        if !ok { http.NotFound(w, r); return }
+        for _, res := range t.Results {
+            if res.StepID == stepID {
+                var body []byte
+                switch v := res.Output.(type) {
+                case string:
+                    body = []byte(v)
+                default:
+                    b, _ := json.Marshal(v)
+                    body = b
+                }
+                if r.URL.Query().Get("download") == "1" {
+                    w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=task_%s_%s.txt", id, stepID))
+                }
+                w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+                w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+                w.WriteHeader(http.StatusOK)
+                w.Write(body)
+                return
+            }
+        }
+        http.NotFound(w, r)
     })
 }
 
@@ -201,4 +240,49 @@ func writeSSE(w http.ResponseWriter, event string, data []byte) {
 func genID() string {
     rand.Seed(time.Now().UnixNano())
     return time.Now().Format("20060102150405") + "-" + string('a'+rune(rand.Intn(26)))
+}
+
+// previewTask builds a preview of a Task to keep payloads small and fast.
+func previewTask(t *models.Task) map[string]any {
+    max := 20000
+    if v := os.Getenv("PREVIEW_MAX_BYTES"); v != "" { if n, err := strconv.Atoi(v); err == nil && n > 0 { max = n } }
+    out := map[string]any{
+        "id": t.ID,
+        "query": t.Query,
+        "status": t.Status,
+        "created_at": t.CreatedAt,
+        "updated_at": t.UpdatedAt,
+    }
+    if t.Plan != nil { out["plan"] = t.Plan }
+    if len(t.Results) > 0 {
+        arr := make([]map[string]any, 0, len(t.Results))
+        for _, r := range t.Results {
+            var size int
+            var preview any
+            var truncated bool
+            switch v := r.Output.(type) {
+            case string:
+                size = len(v)
+                if size > max { preview = v[:max]; truncated = true } else { preview = v }
+            default:
+                b, _ := json.Marshal(v)
+                size = len(b)
+                s := string(b)
+                if size > max { s = s[:max]; truncated = true }
+                preview = s
+            }
+            m := map[string]any{
+                "step_id": r.StepID,
+                "output": preview,
+                "logs": r.Logs,
+                "verified": r.Verified,
+                "error": r.Error,
+                "bytes_total": size,
+            }
+            if truncated { m["preview_truncated"] = true }
+            arr = append(arr, m)
+        }
+        out["results"] = arr
+    }
+    return out
 }

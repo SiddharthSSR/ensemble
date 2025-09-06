@@ -12,6 +12,8 @@ import (
     "github.com/example/agent-orchestrator/internal/models"
     "github.com/example/agent-orchestrator/internal/tools"
     "regexp"
+    "os"
+    "strconv"
 )
 
 type Orchestrator struct {
@@ -103,7 +105,7 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
             t.Results = append(t.Results, res)
             t.Status = models.StatusFailed
             t.UpdatedAt = time.Now()
-            o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+            o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: o.previewResult(res)})
             o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
             o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
             return nil
@@ -114,7 +116,7 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
         t.Results = append(t.Results, res)
         step.Status = models.StatusSuccess
         t.UpdatedAt = time.Now()
-        o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+        o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: o.previewResult(res)})
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
     }
 
@@ -175,7 +177,7 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
             t.Results = append(t.Results, res)
             t.Status = models.StatusFailed
             t.UpdatedAt = time.Now()
-            o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+            o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: o.previewResult(res)})
             o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
             o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
             return nil
@@ -186,7 +188,7 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
         t.Results = append(t.Results, res)
         step.Status = models.StatusSuccess
         t.UpdatedAt = time.Now()
-        o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
+        o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: o.previewResult(res)})
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
     }
     o.hub.StopTokenAppender(id)
@@ -250,4 +252,33 @@ func stringifyOutput(v any) string {
         b, _ := json.Marshal(t)
         return string(b)
     }
+}
+
+func (o *Orchestrator) previewResult(res *models.Result) map[string]any {
+    max := 20000
+    if v := os.Getenv("PREVIEW_MAX_BYTES"); v != "" { if n, err := strconv.Atoi(v); err == nil && n > 0 { max = n } }
+    preview := res.Output
+    var size int
+    var truncated bool
+    switch t := res.Output.(type) {
+    case string:
+        size = len(t)
+        if size > max { preview = t[:max]; truncated = true }
+    default:
+        s := stringifyOutput(res.Output)
+        size = len(s)
+        if size > max { s = s[:max]; truncated = true }
+        preview = s
+    }
+    out := map[string]any{
+        "step_id":  res.StepID,
+        "output":   preview,
+        "logs":     res.Logs,
+        "verified": res.Verified,
+        "error":    res.Error,
+    }
+    // annotate preview metadata
+    if truncated { out["preview_truncated"] = true }
+    out["bytes_total"] = size
+    return out
 }
