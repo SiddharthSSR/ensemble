@@ -24,6 +24,8 @@ func (t *CSVParseTool) Execute(ctx context.Context, inputs map[string]any) (any,
     raw, _ := inputs["csv"].(string)
     if strings.TrimSpace(raw) == "" { return []map[string]string{}, "", nil }
     rdr := csv.NewReader(strings.NewReader(raw))
+    // allow ragged rows
+    rdr.FieldsPerRecord = -1
 
     // delimiter
     if d, ok := inputs["delimiter"].(string); ok && d != "" {

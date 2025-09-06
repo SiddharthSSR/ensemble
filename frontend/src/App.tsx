@@ -350,13 +350,18 @@ export default function App() {
                 <ul className="list">
                   {selected.results.map((r:any,i:number) => (
                     <li key={i} className="item">
-                      <div className="row"><strong>{r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
+                      <div className="row">
+                        <div style={{display:'flex', alignItems:'center', gap:8}}>
+                          <strong>{r.step_id}</strong>
+                          <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span>
+                        </div>
+                        <div className="toolbar small">
+                          <a className="btn ghost sm" href={`${API(`/tasks/result/${selected?.id}/${r.step_id}`)}`} target="_blank" rel="noreferrer">View full</a>
+                          <a className="btn ghost sm" href={`${API(`/tasks/result/${selected?.id}/${r.step_id}?download=1`)}`}>Download</a>
+                        </div>
+                      </div>
                       {r.logs ? <div className="muted small">{r.logs}</div> : null}
                       <ClampedPre text={typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)} keyId={`out-${i}`} label="output" />
-                      <div className="toolbar small" style={{justifyContent:'flex-end', gap:8}}>
-                        <a className="btn ghost sm" href={`${API(`/tasks/result/${selected?.id}/${r.step_id}`)}`} target="_blank" rel="noreferrer">View full</a>
-                        <a className="btn ghost sm" href={`${API(`/tasks/result/${selected?.id}/${r.step_id}?download=1`)}`}>Download</a>
-                      </div>
                     </li>
                   ))}
                 </ul>

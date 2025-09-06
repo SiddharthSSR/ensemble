@@ -45,7 +45,8 @@
       .FAILED { background: #4a1010; }
       .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color: var(--primary); border-radius:50%; animation: spin 1s linear infinite; margin-left:6px; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; white-space: pre-wrap; overflow: auto; max-height: 50vh; }
+      pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; white-space: pre-wrap; overflow: auto; max-height: 50vh; word-break: break-word; }
+      .app, .card { overflow-x: hidden; }
       .prebar { display:flex; align-items:center; justify-content: space-between; gap:8px; margin-top:4px; }
       .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
