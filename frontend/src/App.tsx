@@ -24,6 +24,8 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [llmInfo, setLlmInfo] = useState<any | null>(null)
   const [streaming, setStreaming] = useState<Record<string,string>>({})
+  const streamBufRef = useRef<Record<string,string>>({})
+  const flushTimerRef = useRef<number | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
@@ -153,13 +155,39 @@ export default function App() {
           const sid = ev.payload?.step_id
           const ch = ev.payload?.chunk || ''
           if (!sid || !ch) return
-          setStreaming(prev => ({ ...prev, [sid]: (prev[sid]||'') + ch }))
+          // buffer tokens and flush on a 100ms cadence to reduce re-renders
+          const buf = streamBufRef.current
+          buf[sid] = (buf[sid] || '') + ch
         }
       } catch {}
     })
     setEs(src)
+
+    // start flush timer (100ms cadence)
+    if (flushTimerRef.current) { window.clearInterval(flushTimerRef.current) }
+    flushTimerRef.current = window.setInterval(() => {
+      const buf = streamBufRef.current
+      const keys = Object.keys(buf)
+      if (!keys.length) return
+      setStreaming(prev => {
+        const next = { ...prev }
+        for (const k of keys) {
+          next[k] = (next[k] || '') + buf[k]
+          delete buf[k]
+        }
+        return next
+      })
+    }, 100) as unknown as number
     return () => { src.close() }
   }, [selected?.id])
+
+  // cleanup flush timer when component unmounts or selection changes
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) { window.clearInterval(flushTimerRef.current); flushTimerRef.current = null }
+      streamBufRef.current = {}
+    }
+  }, [])
 
   async function createTask() {
     setBusy(true)
