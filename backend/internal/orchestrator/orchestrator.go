@@ -90,8 +90,9 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
         // resolve input references from prior step outputs (deeply)
         step.Inputs = resolveInputsDeep(step.Inputs, resultsByID)
         // attach token streaming callback for LLM tools
+        appender := o.hub.TokenAppender(id)
         subCtx := context.WithValue(ctx, tools.CtxTokenCallbackKey, tools.TokenCallback(func(chunk string) {
-            o.hub.Publish(id, Event{Event: "token", TaskID: id, Payload: map[string]any{"step_id": step.ID, "chunk": chunk}})
+            appender(step.ID, chunk)
         }))
         res, _ := o.Executor.Execute(subCtx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
@@ -117,6 +118,8 @@ func (o *Orchestrator) Start(ctx context.Context, id string) error {
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
     }
 
+    // flush token coalescer
+    o.hub.StopTokenAppender(id)
     t.Status = models.StatusSuccess
     t.UpdatedAt = time.Now()
     o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})
@@ -159,8 +162,9 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
         t.UpdatedAt = time.Now()
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
         step.Inputs = resolveInputsDeep(step.Inputs, resultsByID)
+        appender := o.hub.TokenAppender(id)
         subCtx := context.WithValue(ctx, tools.CtxTokenCallbackKey, tools.TokenCallback(func(chunk string) {
-            o.hub.Publish(id, Event{Event: "token", TaskID: id, Payload: map[string]any{"step_id": step.ID, "chunk": chunk}})
+            appender(step.ID, chunk)
         }))
         res, _ := o.Executor.Execute(subCtx, step)
         verified, _ := o.Verifier.Verify(ctx, t, step, res)
@@ -185,6 +189,7 @@ func (o *Orchestrator) ExecutePlan(ctx context.Context, id string) error {
         o.hub.Publish(id, Event{Event: "result", TaskID: id, Payload: res})
         o.hub.Publish(id, Event{Event: "step_status", TaskID: id, Payload: step})
     }
+    o.hub.StopTokenAppender(id)
     t.Status = models.StatusSuccess
     t.UpdatedAt = time.Now()
     o.hub.Publish(id, Event{Event: "task_status", TaskID: id, Payload: map[string]any{"status": t.Status}})

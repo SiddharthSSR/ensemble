@@ -129,8 +129,8 @@ func (m *MockPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan
             },
             {
                 ID:          "step3",
-                Description: "Summarize content",
-                Tool:        "summarize",
+                Description: "Summarize content (chunked)",
+                Tool:        "summarize_chunked",
                 Inputs:      map[string]any{"text": "{{step:step2.output}}"},
                 Deps:        []string{"step2"},
                 Status:      models.StatusPending,

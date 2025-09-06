@@ -80,13 +80,13 @@ func buildPlanPrompt(task *models.Task) string {
         return fmt.Sprintf(`You are a planning agent for a constrained tool runner.
 Output ONLY a JSON array of step objects, no prose, no code fences.
 
-Single tool available:
-- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract|file_extract|csv_parse|json_pretty", "inputs": object}
+ Single tool available:
+ - call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|summarize_chunked|llm_answer|http_post_json|pdf_extract|file_extract|csv_parse|json_pretty", "inputs": object}
 
 Rules:
 - Produce 1–3 ordered steps (prefer 2 when helpful) and use "deps" for ordering.
 - To pass previous output to a later step, set a string inside inputs to: {{step:ID.output}}
-- If the query contains or implies a URL, plan: (1) call_tool(http_get) -> (2) call_tool(html_to_text) -> (3) call_tool(summarize).
+ - If the query contains or implies a URL, plan: (1) call_tool(http_get) -> (2) call_tool(html_to_text) -> (3) call_tool(summarize_chunked).
 - If the query starts with "summarize:" or "summarise:", use a single call_tool(summarize) with the rest of the query.
 - For JSON API calls, use a single call_tool(http_post_json) with the URL and JSON.
 - For direct questions, use a single call_tool(llm_answer).
@@ -109,6 +109,7 @@ Tools (you MUST stick to these):
 - http_get: inputs {"url": string}
 - html_to_text: inputs {"html": string}
 - summarize: inputs {"text": string}
+- summarize_chunked: inputs {"text": string, "chunk_chars?": number, "overlap_chars?": number}
 - llm_answer: inputs {"text": string}
 - http_post_json: inputs {"url": string, "json": any}
 - pdf_extract: inputs {"data_base64": string}
