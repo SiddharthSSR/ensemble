@@ -65,9 +65,18 @@ func (m *MockPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan
         if data, ok := first["data_base64"].(string); ok && data != "" {
             fname, _ := first["filename"].(string)
             ctype, _ := first["content_type"].(string)
-            isCSV := strings.HasSuffix(strings.ToLower(fname), ".csv") || strings.Contains(strings.ToLower(ctype), "csv") || strings.Contains(strings.ToLower(ctype), "ms-excel")
+            lf, lc := strings.ToLower(fname), strings.ToLower(ctype)
+            isCSV := strings.HasSuffix(lf, ".csv") || strings.Contains(lc, "csv") || strings.Contains(lc, "ms-excel")
+            isJSON := strings.HasSuffix(lf, ".json") || strings.Contains(lc, "json")
             // If summarize requested, summarize the extracted text; else answer using it as context
             if strings.Contains(q, "summarize") || strings.Contains(q, "summarise") {
+                if isJSON {
+                    return &models.Plan{Steps: []*models.Step{
+                        { ID: "step1", Description: "Extract text from file", Tool: pickUnified("file_extract"), Inputs: wrapIfUnified("file_extract", map[string]any{"data_base64": data, "filename": first["filename"], "content_type": first["content_type"]}), Status: models.StatusPending },
+                        { ID: "step2", Description: "Pretty-print JSON", Tool: pickUnified("json_pretty"), Inputs: wrapIfUnified("json_pretty", map[string]any{"json": "{{step:step1.output}}"}), Deps: []string{"step1"}, Status: models.StatusPending },
+                        { ID: "step3", Description: "Summarize JSON", Tool: pickUnified("summarize"), Inputs: wrapIfUnified("summarize", map[string]any{"text": "{{step:step2.output}}"}), Deps: []string{"step2"}, Status: models.StatusPending },
+                    }}, nil
+                }
                 if isCSV {
                     return &models.Plan{Steps: []*models.Step{
                         { ID: "step1", Description: "Extract text from file", Tool: pickUnified("file_extract"), Inputs: wrapIfUnified("file_extract", map[string]any{"data_base64": data, "filename": first["filename"], "content_type": first["content_type"]}), Status: models.StatusPending },
@@ -78,6 +87,13 @@ func (m *MockPlanner) Plan(ctx context.Context, task *models.Task) (*models.Plan
                 return &models.Plan{Steps: []*models.Step{
                     { ID: "step1", Description: "Extract text from file", Tool: pickUnified("file_extract"), Inputs: wrapIfUnified("file_extract", map[string]any{"data_base64": data, "filename": first["filename"], "content_type": first["content_type"]}), Status: models.StatusPending },
                     { ID: "step2", Description: "Summarize file content", Tool: pickUnified("summarize"), Inputs: wrapIfUnified("summarize", map[string]any{"text": "{{step:step1.output}}"}), Deps: []string{"step1"}, Status: models.StatusPending },
+                }}, nil
+            }
+            if isJSON {
+                return &models.Plan{Steps: []*models.Step{
+                    { ID: "step1", Description: "Extract text from file", Tool: pickUnified("file_extract"), Inputs: wrapIfUnified("file_extract", map[string]any{"data_base64": data, "filename": first["filename"], "content_type": first["content_type"]}), Status: models.StatusPending },
+                    { ID: "step2", Description: "Pretty-print JSON", Tool: pickUnified("json_pretty"), Inputs: wrapIfUnified("json_pretty", map[string]any{"json": "{{step:step1.output}}"}), Deps: []string{"step1"}, Status: models.StatusPending },
+                    { ID: "step3", Description: "Answer using JSON context", Tool: pickUnified("llm_answer"), Inputs: wrapIfUnified("llm_answer", map[string]any{ "text": task.Query, "instructions": "Use the following JSON as context.\n\nContext:\n{{step:step2.output}}" }), Deps: []string{"step2"}, Status: models.StatusPending },
                 }}, nil
             }
             if isCSV {

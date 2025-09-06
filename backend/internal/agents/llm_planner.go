@@ -81,7 +81,7 @@ func buildPlanPrompt(task *models.Task) string {
 Output ONLY a JSON array of step objects, no prose, no code fences.
 
 Single tool available:
-- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract|file_extract|csv_parse", "inputs": object}
+- call_tool: inputs {"tool": "echo|http_get|html_to_text|summarize|llm_answer|http_post_json|pdf_extract|file_extract|csv_parse|json_pretty", "inputs": object}
 
 Rules:
 - Produce 1–3 ordered steps (prefer 2 when helpful) and use "deps" for ordering.
@@ -93,7 +93,7 @@ Rules:
 
  PDF/files in context:
  - If context has 'pdf_data_base64', prefer: call_tool(pdf_extract) then summarize or llm_answer with its output.
- - If context has 'attachments' (array of files with data_base64/filename/content_type), start with call_tool(file_extract) on the first attachment. If the filename ends with .csv or the content-type suggests CSV/MS-Excel, insert call_tool(csv_parse) with {"csv": "{{step:step1.output}}"} before summarize/llm_answer.
+ - If context has 'attachments' (array of files with data_base64/filename/content_type), start with call_tool(file_extract) on the first attachment. If CSV/MS-Excel, insert call_tool(csv_parse) with {"csv": "{{step:step1.output}}"}. If JSON, insert call_tool(json_pretty) with {"json": "{{step:step1.output}}"}.
 
 Schema for each step: {"id": "stepN", "description": "...", "tool": "call_tool", "inputs": {"tool": "...", "inputs": {...}}, "deps": ["stepK"]}
 
@@ -113,6 +113,8 @@ Tools (you MUST stick to these):
 - http_post_json: inputs {"url": string, "json": any}
 - pdf_extract: inputs {"data_base64": string}
 - file_extract: inputs {"data_base64": string, "filename?": string, "content_type?": string}
+- csv_parse: inputs {"csv": string, "delimiter?": string}
+- json_pretty: inputs {"json": string}
 - csv_parse: inputs {"csv": string, "delimiter?": string}
 
 Rules:
