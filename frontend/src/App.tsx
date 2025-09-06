@@ -351,6 +351,10 @@ export default function App() {
                       <div className="row"><strong>{r.step_id}</strong> <span className={`badge ${r.error? 'FAILED': (r.verified? 'SUCCESS':'PENDING')}`}>{r.error? 'ERROR': (r.verified? 'VERIFIED':'UNVERIFIED')}</span></div>
                       {r.logs ? <div className="muted small">{r.logs}</div> : null}
                       <ClampedPre text={typeof r.output === 'string' ? r.output : JSON.stringify(r.output,null,2)} keyId={`out-${i}`} label="output" />
+                      <div className="toolbar small" style={{justifyContent:'flex-end', gap:8}}>
+                        <a className="btn ghost sm" href={`${API(`/tasks/result/${selected?.id}/${r.step_id}`)}`} target="_blank" rel="noreferrer">View full</a>
+                        <a className="btn ghost sm" href={`${API(`/tasks/result/${selected?.id}/${r.step_id}?download=1`)}`}>Download</a>
+                      </div>
                     </li>
                   ))}
                 </ul>
