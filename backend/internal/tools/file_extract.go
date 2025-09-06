@@ -26,7 +26,11 @@ func (t *FileExtractTool) Execute(ctx context.Context, inputs map[string]any) (a
     buf, err := base64.StdEncoding.DecodeString(b64)
     if err != nil { return nil, "", fmt.Errorf("invalid base64: %w", err) }
     max := getInt(inputs, "max_bytes", envInt("FILE_MAX_BYTES", 20*1024*1024))
-    if len(buf) > max { return nil, "", fmt.Errorf("file too large: %d bytes > limit %d", len(buf), max) }
+    truncated := false
+    if len(buf) > max {
+        buf = buf[:max]
+        truncated = true
+    }
 
     // Determine type
     filename, _ := inputs["filename"].(string)
@@ -61,12 +65,15 @@ func (t *FileExtractTool) Execute(ctx context.Context, inputs map[string]any) (a
         if ext != "" { meta = append(meta, "ext="+ext) }
         if ctype != "" { meta = append(meta, "ctype="+ctype) }
         meta = append(meta, fmt.Sprintf("len=%d", len(text)))
+        if truncated { meta = append(meta, "truncated=true") }
         return text, strings.Join(meta, " "), nil
     }
 
     // Unknown/binary — still return raw text safely trimmed to avoid failing flows
     text := strings.TrimSpace(string(buf))
-    return text, fmt.Sprintf("binary? len=%d", len(text)), nil
+    log := fmt.Sprintf("binary? len=%d", len(text))
+    if truncated { log += " truncated=true" }
+    return text, log, nil
 }
 
 func prependLog(kind, logs string) string {
